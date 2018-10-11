@@ -1,0 +1,18 @@
+{
+  "name": "hhhfreshbotredux",
+  "version": "0.0.0",
+  "description": "A reddit bot to scan r/hiphopheads for FRESH posts and create weekly roundups",
+  "main": "hhhfreshbotredux.js",
+  "repository": "github.com/btouellette/hhhfreshbotredux",
+  "author": "Brian Ouellette <btouellette@gmail.com>",
+  "license": "MIT",
+  "engines": {
+    "node": "10.12.0"
+  },
+  "dependencies": {
+    "node-schedule": "^1.3.0",
+    "pg": "^7.5.0",
+    "snoowrap": "^1.15.2",
+    "winston": "^3.1.0"
+  }
+}
