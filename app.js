@@ -47,10 +47,10 @@ const DB = {
   init: async function() {
     // Connect and create tables
     await DB.client.connect();
-    await Promise.all([
-          DB.client.query('CREATE TABLE IF NOT EXISTS subscriptions(username TEXT, type TEXT);'),
-          DB.client.query('CREATE TABLE IF NOT EXISTS posts(day DATE, id TEXT PRIMARY KEY, title TEXT, permalink TEXT, url TEXT, time INT);')
-      ]);
+    return Promise.all([
+      DB.client.query('CREATE TABLE IF NOT EXISTS subscriptions(username TEXT, type TEXT);'),
+      DB.client.query('CREATE TABLE IF NOT EXISTS posts(day DATE, id TEXT PRIMARY KEY, title TEXT, permalink TEXT, url TEXT, time INT);')
+    ]);
   },
   
   close: function() {
@@ -71,14 +71,19 @@ const FreshBot = {
   },
   
   getNewPosts: async function() {
-    //TODO: set time option based on how far behind the DB is
+    let maxTimeInDB = await DB.getMaxTimestamp();
+    let secondsBehind = new Date() / 1000 - maxTimeInDB;
+    let timeFilter = secondsBehind >= 604800 ? 'month' : 
+                     secondsBehind >= 86400  ? 'week' : 
+                     secondsBehind >= 3600   ? 'day' : 
+                                               'hour';
     let redditPosts = reddit.search({ query: '[FRESH',
                                       subreddit: 'hiphopheads',
                                       sort: 'new',
-                                      time: 'day' });
-    let maxTime = await DB.getMaxTimestamp();
-    let filteredPosts = redditPosts.filter(record => record.created_utc >= maxTime);
-    logger.debug(JSON.stringify(await filteredPosts));
+                                      time: timeFilter });
+    let newPosts = redditPosts.filter(record => record.created_utc >= maxTimeInDB);
+    logger.debug(JSON.stringify(await newPosts));
+    return newPosts;
   },
 
   init: async function() {
