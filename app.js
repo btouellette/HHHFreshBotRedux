@@ -60,6 +60,9 @@ const DB = {
 
 const FreshBot = {
   scheduleJob: function() {
+    // https://devcenter.heroku.com/articles/scheduler
+    // Make sure process is scaled to worker=1 so that it doesn't kick off multiple jobs at the same time
+    
     // This rule is standard cron syntax for midnight every day.
     // See http://stackoverflow.com/a/5398044/1252653
     var rule = '0 0 * * *';
@@ -88,8 +91,16 @@ const FreshBot = {
 
   init: async function() {
     let freshPosts = FreshBot.getNewPosts();
-    await DB.init();
+    await Promise.all([
+      DB.init(),
+      freshPosts
+    ]);
+    // Add any new posts to posts table in DB
+    // Process incoming messages and record any new subscriptions/unsubscriptions
+    // Check if a daily or weekly roundup post needs to be made
+    
     //FreshBot.scheduleJob();
+    process.exit(0);
   }
 };
 
