@@ -46,7 +46,7 @@ const config = {
     SELF_POST_MAX_LENGTH: process.env.REDDIT_SELF_POST_MAX_LENGTH || 39500,
     COMMENT_MAX_LENGTH:   process.env.REDDIT_COMMENT_MAX_LENGTH || 9500
   },
-  DB_URL:    process.env.DB_URL,
+  DB_URL:    process.env.DATABASE_URL || process.env.DB_URL,
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
   MIN_SCORE: process.env.MIN_SCORE || 25
 };
