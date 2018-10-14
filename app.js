@@ -43,7 +43,8 @@ const config = {
     ADMIN:         process.env.REDDIT_ADMIN_USER
   },
   DB_URL:    process.env.DB_URL,
-  LOG_LEVEL: process.env.LOG_LEVEL
+  LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+  MIN_SCORE: process.env.MIN_SCORE || 25
 };
 
 const logger = winston.createLogger({
@@ -90,46 +91,76 @@ const DB = {
     return DB.client.query("SELECT DISTINCT username FROM subscriptions WHERE type = 'daily'").then(res => res.rows.map(row => row.username));
   },
   
+  setScore: async function(id, score) {
+    const query = pgformat('UPDATE posts SET score = %L WHERE id = %L', score, id);
+    logger.debug(query);
+    return DB.client.query(query);
+  },
+  
+  getAllPosts: async function() {
+    return DB.client.query('SELECT * FROM posts').then(res => res.rows);
+  },
+  
+  getPostsForDay: async function(date) {
+    const query = pgformat('SELECT * FROM posts WHERE day = %L AND score >= %L ORDER BY score DESC', date.toYYYYMMDD(), config.MIN_SCORE);
+    logger.debug(query);
+    return DB.client.query(query).then(res => res.rows);
+  },
+  
+  getPostsForWeek: async function(startDate, endDate) {
+    const query = pgformat('SELECT * FROM posts WHERE day >= %L AND day < %L AND score >= %L ORDER BY day ASC, score DESC', startDate.toYYYYMMDD(), endDate.toYYYYMMDD(), config.MIN_SCORE);
+    logger.debug(query);
+    return DB.client.query(query).then(res => res.rows);
+  },
+  
   insertPosts: async function(posts) {
-    logger.debug('Adding ' + posts.length + ' new posts to DB');
+    logger.info('Adding ' + posts.length + ' new posts to DB');
     const postsAsArray = posts.map(post => ([post.day, post.id, post.title, post.permalink, post.url, post.created_utc, post.score]));
-    const query = pgformat('INSERT INTO posts(day, id, title, permalink, url, created_utc, score) VALUES %L ON CONFLICT(id) DO NOTHING', postsAsArray);
+    const query = pgformat('INSERT INTO posts(day, id, title, permalink, url, created_utc, score) VALUES %L ON CONFLICT(id) DO UPDATE SET score = EXCLUDED.score', postsAsArray);
+    logger.debug(query);
     //return DB.client.query(query);
   },
   
   subscribeUserToDaily: async function(user) {
-    logger.debug(pgformat("INSERT INTO subscriptions(username, type) VALUES (%L, 'daily')", user));
-    return DB.client.query(pgformat("INSERT INTO subscriptions(username, type) VALUES (%L, 'daily')", user));
+    const query = pgformat("INSERT INTO subscriptions(username, type) VALUES (%L, 'daily')", user);
+    logger.debug(query);
+    return DB.client.query(query);
   },
   
   subscribeUserToWeekly: async function(user) {
-    logger.debug(pgformat("INSERT INTO subscriptions(username, type) VALUES (%L, 'weekly')", user));
-    return DB.client.query(pgformat("INSERT INTO subscriptions(username, type) VALUES (%L, 'weekly')", user));
+    const query = pgformat("INSERT INTO subscriptions(username, type) VALUES (%L, 'weekly')", user);
+    logger.debug(query);
+    return DB.client.query(query);
   },
   
   unsubscribeUser: async function(user) {
-    logger.debug(pgformat("DELETE FROM subscriptions WHERE username = %L", user));
-    return DB.client.query(pgformat("DELETE FROM subscriptions WHERE username = %L", user));
+    const query = pgformat("DELETE FROM subscriptions WHERE username = %L", user);
+    logger.debug(query);
+    return DB.client.query(query);
   },
   
   markDaySent: async function(date) {
-    return DB.client.query(pgformat('UPDATE posts SET daily_sent = true WHERE day = %L', date.toYYYYMMDD()));
+    const query = pgformat('UPDATE posts SET daily_sent = true WHERE day = %L', date.toYYYYMMDD());
+    logger.debug(query);
+    return DB.client.query(query);
   },
   
   purgeDays: async function(startDate, endDate) {
-    return DB.client.query(pgformat('DELETE FROM posts WHERE day BETWEEN %L AND %L', startDate.toYYYYMMDD(), endDate.toYYYYMMDD()));
+    const query = pgformat('DELETE FROM posts WHERE day >= %L AND day < %L', startDate.toYYYYMMDD(), endDate.toYYYYMMDD());
+    logger.debug(query);
+    return DB.client.query(query);
   },
   
   init: async function() {
-    logger.debug('Initializing DB');
+    logger.info('Initializing DB');
     // Connect and create tables
     await DB.client.connect();
     return Promise.all([
       DB.client.query('CREATE TABLE IF NOT EXISTS subscriptions(username TEXT, type TEXT)')
-        .then(DB.client.query('CREATE INDEX IF NOT EXISTS subscriptions_type_idx ON subscriptions (type)')),
+        .then(() => DB.client.query('CREATE INDEX IF NOT EXISTS subscriptions_type_idx ON subscriptions (type)')),
       DB.client.query('CREATE TABLE IF NOT EXISTS posts(day DATE, id TEXT PRIMARY KEY, title TEXT, permalink TEXT, url TEXT, created_utc INT, score INT, daily_sent BOOLEAN DEFAULT FALSE)')
-        .then(DB.client.query('CREATE INDEX IF NOT EXISTS posts_day_idx ON posts (day)'))
-        .then(DB.client.query('CREATE INDEX IF NOT EXISTS posts_created_utc_idx ON posts (created_utc)'))
+        .then(() => DB.client.query('CREATE INDEX IF NOT EXISTS posts_day_idx ON posts (day)'))
+        .then(() => DB.client.query('CREATE INDEX IF NOT EXISTS posts_created_utc_idx ON posts (created_utc)'))
     ]);
   },
   
@@ -139,6 +170,8 @@ const DB = {
 };
 
 const Template = {
+  introDaily: 'Welcome to The Daily Freshness! Fresh /r/hiphopheads posts delivered right to your inbox each day.\n\n',
+  introWeekly: 'Welcome to The Weekly Freshness! Fresh /r/hiphopheads posts delivered right to your inbox each week.\n\n',
   footer: `
 
 ---
@@ -156,7 +189,7 @@ Template.unsubscribeSuccess = 'You have been unsubscribed from all mailing lists
 
 const FreshBot = {
   getNewPosts: async function(maxTimeInDB) {
-    logger.debug('Fetching new posts');
+    logger.info('Fetching new posts');
     
     const secondsBehind = new Date() / 1000 - maxTimeInDB;
     const timeFilter = secondsBehind >= 604800 ? 'month' : 
@@ -184,30 +217,30 @@ const FreshBot = {
     // See how far we've loaded so far
     const maxTimeInDB = await DB.getMaxTimestamp();
     const startDate = new Date(maxTimeInDB * 1000);
-    logger.debug('Previously fetched up to ' + startDate);
+    logger.info('Previously fetched up to ' + startDate);
     
     // Get any new posts since then and add to posts table in DB
-    await DB.insertPosts(await FreshBot.getNewPosts(maxTimeInDB));
+    return DB.insertPosts(await FreshBot.getNewPosts(maxTimeInDB));
   },
   
   processPrivateMessagesForUser: async function(PMs) {
     // Process PMs in order received
     const sortedPMs = PMs.sort((a, b) => { return a.created_utc - b.created_utc; });
-    debugger;
+
     for (let i = 0, len = sortedPMs.length; i < len; i++) {
       const currentPM = sortedPMs[i];
       if (currentPM.subject === 'subscribe' && currentPM.body === 'daily') {
-        await DB.subscribeUserToDaily(currentPM.author.name).then(() => { return currentPM.reply(Template.dailySubSuccess); });
-        console.log('daily');
+        await DB.subscribeUserToDaily(currentPM.author.name).then(() => currentPM.reply(Template.dailySubSuccess));
+        logger.info('Subscribed ' + currentPM.author.name + ' to daily');
       } else if (currentPM.subject === 'subscribe' && currentPM.body === 'weekly') {
-        await DB.subscribeUserToWeekly(currentPM.author.name).then(() => { return currentPM.reply(Template.weeklySubSuccess); });
-        console.log('weekly');
+        await DB.subscribeUserToWeekly(currentPM.author.name).then(() => currentPM.reply(Template.weeklySubSuccess));
+        logger.info('Subscribed ' + currentPM.author.name + ' to weekly');
       } else if (currentPM.subject === 'unsubscribe' && currentPM.body === 'remove') {
-        await DB.unsubscribeUser(currentPM.author.name).then(() => { return currentPM.reply(Template.unsubscribeSuccess); });
-        console.log('remove');
+        await DB.unsubscribeUser(currentPM.author.name).then(() => currentPM.reply(Template.unsubscribeSuccess));
+        logger.info('Unsubscribed ' + currentPM.author.name);
       } else {
         await currentPM.reply(Template.replyToUnknown);
-        console.log('???');
+        logger.info('Unhandled private message from ' + currentPM.author.name);
       }
     }
   },
@@ -216,7 +249,7 @@ const FreshBot = {
     const newMessages = await reddit.getUnreadMessages();
     const newPMs = newMessages.filter(msg => !msg.was_comment);
     
-    logger.debug('Processing ' + newPMs.length + ' new PMs');
+    logger.info('Processing ' + newPMs.length + ' new PMs');
     
     // Group PMs to handle PMs from different users in parallel
     const groupedPMs = newPMs.reduce((r, pm) => { 
@@ -225,29 +258,48 @@ const FreshBot = {
       return r;
     }, Object.create(null));
     
+    // Send to each user
     const doneProcessingPMs = [];
     for (var username in groupedPMs) {
       doneProcessingPMs.push(FreshBot.processPrivateMessagesForUser(groupedPMs[username]));
     }
     
-    //doneProcessingPMs.push(reddit.markMessagesAsRead(newMessages));
+    // Mark any messages as read
+    if (newMessages.length > 0) {
+      doneProcessingPMs.push(reddit.markMessagesAsRead(newMessages));
+    }
     
     return Promise.all(doneProcessingPMs);
+  },
+  
+  sendDailyMessages: async function(posts) {
+    //TODO
+    // Character limit of 40k on self posts, 10k on message, if exceeded add remaining in comments or second message
+  },
+  
+  sendWeeklyMessages: async function(posts) {
+    //TODO
+  },
+  
+  makeWeeklyPost: async function(posts) {
+    //TODO
   },
   
   generateDailyMessages: async function(endDate) {
     // Generate daily messages to subscribers
     const minUnsentDate = await DB.getMinUnsentDate();
-    logger.debug('Daily messages sent up to ' + minUnsentDate);
+    logger.info('Daily messages sent up to ' + minUnsentDate);
     
     // Check if daily messages needs to be sent
     const sentDaysDone = [];
     for (let dayStart = new Date(minUnsentDate); dayStart.addDays(1).addHours(6) < endDate; dayStart = dayStart.addDays(1)) {
       // We've loaded 6 hours into a new day, send daily messages and post
       const dayEnd = dayStart.addDays(1);
-      logger.debug('Processing day between ' + dayStart + ' and ' + dayEnd);
+      logger.info('Processing day between ' + dayStart + ' and ' + dayEnd);
       
-      //TODO
+      // Get days posts and send any messages
+      const postsFetched = DB.getPostsForDay(dayStart);
+      sentDaysDone.push(postsFetched.then(posts => FreshBot.sendDailyMessages(posts)));
       
       // Update DB to mark this day sent
       sentDaysDone.push(DB.markDaySent(minUnsentDate));
@@ -262,33 +314,55 @@ const FreshBot = {
     for (let weekStart = await DB.getMinDate(); weekStart.addDays(7).addHours(6) < endDate; weekStart = weekStart.addDays(7)) {
       // We've loaded 6 hours into a new week, send weekly messages and post
       const weekEnd = weekStart.addDays(7);
-      logger.debug('Processing week between ' + weekStart + ' and ' + weekEnd);
+      logger.info('Processing week between ' + weekStart + ' and ' + weekEnd);
       
-      //TODO
-      // Character limit of 40k on self posts, if exceeded add remaining in comments
+      // Get weeks posts, send messages, and post to r/hiphopheads
+      const postsFetched = DB.getPostsForWeek(weekStart, weekEnd);
+      sentWeeksDone.push(postsFetched.then(posts => FreshBot.sendWeeklyMessages(posts)));
+      sentWeeksDone.push(postsFetched.then(posts => FreshBot.makeWeeklyPost(posts)));
       
       // Purge DB of previous week's data
       sentWeeksDone.push(DB.purgeDays(weekStart, weekEnd));
     }
     return Promise.all(sentWeeksDone);
   },
-
+  
+  updateScores: async function () {
+    // Get all posts and for each check whether the score recorded matches the score currently on reddit
+    const posts = await DB.getAllPosts();
+    
+    const updateDone = [];
+    posts.forEach(async post => {
+      const newScore = await reddit.getSubmission(posts.id).score;
+      if (posts.score !== newScore) {
+        // Update the DB with the new score if it didn't match
+        updateDone.push(DB.setScore(post.id, newScore));
+      }
+    });
+    
+    return Promise.all(updateDone);
+  },
+  
   start: async function() {
-    logger.debug('Starting');
+    logger.info('Starting');
     
-    // Start up DB connection then fetch new reddit posts
+    // Start up DB connection
     await DB.init();
-    await FreshBot.fetchNewPosts();
     
-    // Process incoming messages and record any new subscriptions/unsubscriptions
-    // Let all users register before moving on to creating posts
-    await FreshBot.processPrivateMessages();
+    // 1) Process incoming messages and record any new subscriptions/unsubscriptions. Let all users register before moving on to creating posts/messages
+    // 2) Update scores on previously loaded posts
+    // 3) Populate new posts into database
+    await Promise.all([
+      FreshBot.processPrivateMessages(),
+      FreshBot.updateScores(),
+      FreshBot.fetchNewPosts()
+    ]);
     
     const endDate = await DB.getMaxTimestamp().then(ts => new Date(ts * 1000));
-    logger.debug('Loaded posts up to ' + endDate);
+    logger.info('Loaded posts up to ' + endDate);
     
-    await FreshBot.generateDailyMessages(endDate);
     // Wait on days to be completed before moving to week processing as week processing will purge DB
+    await FreshBot.generateDailyMessages(endDate);
     await FreshBot.generateWeeklyMessagesAndPost(endDate);
     
     await DB.close();
@@ -301,13 +375,11 @@ Date.prototype.addDays = function (days) {
   newDate.setDate(newDate.getDate() + days);
   return newDate;
 };
-
 Date.prototype.addHours = function (hours) {
   var newDate = new Date(this);
   newDate.setHours(newDate.getHours() + hours);
   return newDate;
 };
-
 Date.prototype.toYYYYMMDD = function () {
   return this.toISOString().slice(0,10).replace(/-/g,"");
 };
