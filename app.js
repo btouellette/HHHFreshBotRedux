@@ -100,7 +100,7 @@ const DB = {
   
   getMaxTimestamp: async function() {
     // If no posts added yet start with last Sunday
-    return DB.client.query("SELECT COALESCE(MAX(created_utc), EXTRACT(epoch from current_date - cast(extract(dow from current_date) as int) as max_time FROM posts").then(res => res.rows[0].max_time);
+    return DB.client.query("SELECT COALESCE(MAX(created_utc), EXTRACT(epoch from current_date - cast(extract(dow from current_date) as int)) as max_time FROM posts").then(res => res.rows[0].max_time);
   },
   
   getMinDate: async function() {
