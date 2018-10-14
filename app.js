@@ -36,12 +36,15 @@ const mdescape = require('markdown-escape');
 
 const config = {
   reddit: {
-    USER_AGENT:    process.env.REDDIT_USER_AGENT,
-    CLIENT_ID:     process.env.REDDIT_CLIENT_ID, // get ID and secret for app from https://www.reddit.com/prefs/apps/
-    CLIENT_SECRET: process.env.REDDIT_CLIENT_SECRET,
-    USERNAME:      process.env.REDDIT_USERNAME,
-    PASSWORD:      process.env.REDDIT_PASSWORD,
-    ADMIN:         process.env.REDDIT_ADMIN_USER
+    USER_AGENT:           process.env.REDDIT_USER_AGENT,
+    CLIENT_ID:            process.env.REDDIT_CLIENT_ID, // get ID and secret for app from https://www.reddit.com/prefs/apps/
+    CLIENT_SECRET:        process.env.REDDIT_CLIENT_SECRET,
+    USERNAME:             process.env.REDDIT_USERNAME,
+    PASSWORD:             process.env.REDDIT_PASSWORD,
+    ADMIN:                process.env.REDDIT_ADMIN_USER,
+    PM_MAX_LENGTH:        process.env.REDDIT_PM_MAX_LENGTH || 9500, // Current reddit limits are 10k char for PM and comment and 40k char for self post but defaults will undershoot those slightly
+    SELF_POST_MAX_LENGTH: process.env.REDDIT_SELF_POST_MAX_LENGTH || 39500,
+    COMMENT_MAX_LENGTH:   process.env.REDDIT_COMMENT_MAX_LENGTH || 9500
   },
   DB_URL:    process.env.DB_URL,
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
@@ -70,7 +73,7 @@ reddit.config({
   requestDelay: 0,
   continueAfterRatelimitError: true,
   maxRetryAttempts: 5,
-  debug: config.LOG_LEVEL === 'debug'
+  //debug: config.LOG_LEVEL === 'debug'
 });
 
 const Template = {
@@ -96,17 +99,16 @@ const DB = {
   client: new pg.Client({ connectionString: config.DB_URL }),
   
   getMaxTimestamp: async function() {
-    return DB.client.query("SELECT COALESCE(MAX(created_utc), EXTRACT(epoch from current_date - interval '7 days')) as max_time FROM posts").then(res => res.rows[0].max_time);
+    // If no posts added yet start with last Sunday
+    return DB.client.query("SELECT COALESCE(MAX(created_utc), EXTRACT(epoch from current_date - cast(extract(dow from current_date) as int) as max_time FROM posts").then(res => res.rows[0].max_time);
   },
   
   getMinDate: async function() {
-    //TODO: remove coalesce
-    return DB.client.query("SELECT COALESCE(MIN(day), current_date) as min_date FROM posts").then(res => res.rows[0].min_date);
+    return DB.client.query("SELECT MIN(day) as min_date FROM posts").then(res => res.rows[0].min_date);
   },
   
   getMinUnsentDate: async function() {
-    //TODO: remove coalesce
-    return DB.client.query("SELECT COALESCE(MIN(day), current_date) as min_date FROM posts WHERE daily_sent = false").then(res => res.rows[0].min_date);
+    return DB.client.query("SELECT MIN(day) as min_date FROM posts WHERE daily_sent = false").then(res => res.rows[0].min_date);
   },
   
   getWeeklySubscribers: async function() {
@@ -196,6 +198,8 @@ const DB = {
 };
 
 const FreshBot = {
+  scoresUpdated: false,
+  
   getNewPostsFromReddit: async function(maxTimeInDB) {
     
     const secondsBehind = new Date() / 1000 - maxTimeInDB;
@@ -204,7 +208,7 @@ const FreshBot = {
                        secondsBehind >= 3600   ? 'day' : 
                                                  'hour';    
     logger.info('Fetching new posts from last ' + timeFilter);
-    //TODO: this always returns max of 250 posts?
+    // This will return only ~250 posts (see https://github.com/not-an-aardvark/snoowrap/issues/162)
     return reddit.search({ query: '[FRESH',
                            subreddit: 'hiphopheads',
                            sort: 'new',
@@ -285,14 +289,13 @@ const FreshBot = {
   formatPostsToTable: async function(posts) {
     let message = Template.tableHeader;
     posts.forEach(post => {
-      message += '[' + mdescape(post.title).replace('|', '\\|') + '](' + post.url + ') | [link](' + post.permalink + ') | +' + post.score + ' | /u/' + post.author + '\n';
+      message += '[' + mdescape(post.title).replace('|', '&#124;') + '](' + post.url + ') | [link](' + post.permalink + ') | +' + post.score + ' | /u/' + post.author + '\n';
     });
     message += '\n';
     return message;
   },
   
   sendDailyMessages: async function(posts, dayStart) {
-    //TODO: Character limit of 40k on self posts, 10k on message, if exceeded add remaining in comments or second message)
     let message = Template.introDaily;
     //message += '**' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + '**\n\n';
     message += await FreshBot.formatPostsToTable(posts);
@@ -307,13 +310,7 @@ const FreshBot = {
     
     const messagesSent = [];
     const subs = await DB.getDailySubscribers();
-    subs.forEach(sub => {
-      messagesSent.push(reddit.composeMessage({
-        to: sub,
-        subject: subject,
-        text: message
-      }));
-    });
+    subs.forEach(sub => { messagesSent.push(FreshBot.sendMessagesToSub(sub, subject, [message])); });
     
     return Promise.all(messagesSent);
   },
@@ -326,12 +323,22 @@ const FreshBot = {
       return r;
     }, Object.create(null));
     
-    let message = Template.introWeekly;
+    const messages = [];
+    let message = '';
     for (var day in groupedPosts) {
-      message += '**' + day.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + '**\n\n';
-      message += await FreshBot.formatPostsToTable(groupedPosts[day]);
+      let dayTable = '**' + day.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + '**\n\n';
+      dayTable += await FreshBot.formatPostsToTable(groupedPosts[day]);
+      
+      if (Template.introWeekly.length + message.length + dayTable.length + Template.footer.length > config.reddit.PM_MAX_LENGTH) {
+        message = messages.length == 0 ? Template.introWeekly : '' + '**Part ' + (messages.length + 1) + '**\n\n' + message + Template.footer;
+        messages.push(message);
+        message = dayTable;
+      } else {
+        message += dayTable;
+      }
     }
-    message += Template.footer;
+    message = Template.introWeekly + (messages.length == 0 ? '' :  '**Part ' + (messages.length + 1) + '**\n\n') + message + Template.footer;
+    messages.push(message);
     
     const subject = 'The Weekly [Fresh]ness - week of ' + weekStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
@@ -342,15 +349,20 @@ const FreshBot = {
     
     const messagesSent = [];
     const subs = await DB.getDailySubscribers();
-    subs.forEach(sub => {
-      messagesSent.push(reddit.composeMessage({
-        to: sub,
-        subject: subject,
-        text: message
-      }));
-    });
+    subs.forEach(sub => { messagesSent.push(FreshBot.sendWeeklyMessagesToSub(sub, subject, message)); });
     
     return Promise.all(messagesSent);
+  },
+  
+  sendMessagesToSub: async function(sub, subject, messages) {
+    // Send messages to a specific subscriber in order
+    for (let i = 0, len = messages.length; i < len; i++) {
+      await reddit.composeMessage({
+        to: sub,
+        subject: subject,
+        text: messages[i]
+      });
+    }
   },
   
   makeWeeklyPost: async function(posts, weekStart) {
@@ -365,6 +377,10 @@ const FreshBot = {
     // Check if daily messages needs to be sent
     const sentDaysDone = [];
     for (let dayStart = new Date(minUnsentDate); dayStart.addDays(1).addHours(6) < endDate; dayStart = dayStart.addDays(1)) {
+      if (!FreshBot.scoresUpdated) {
+        await FreshBot.updateScores();
+        FreshBot.scoresUpdated = true;
+      }
       // We've loaded 6 hours into a new day, send daily messages and post
       const dayEnd = dayStart.addDays(1);
       logger.info('Processing day between ' + dayStart + ' and ' + dayEnd);
@@ -374,7 +390,7 @@ const FreshBot = {
       sentDaysDone.push(postsFetched.then(posts => FreshBot.sendDailyMessages(posts, dayStart)));
       
       // Update DB to mark this day sent
-      sentDaysDone.push(DB.markDaySent(minUnsentDate));
+      sentDaysDone.push(DB.markDaySent(dayStart));
     }
     return Promise.all(sentDaysDone);
   },
@@ -385,6 +401,10 @@ const FreshBot = {
     const sentWeeksDone = [];
     
     for (let weekStart = await DB.getMinDate(); weekStart.addDays(7).addHours(6) < endDate; weekStart = weekStart.addDays(7)) {
+      if (!FreshBot.scoresUpdated) {
+        await FreshBot.updateScores();
+        FreshBot.scoresUpdated = true;
+      }
       // We've loaded 6 hours into a new week, send weekly messages and post
       const weekEnd = weekStart.addDays(7);
       logger.info('Processing week between ' + weekStart + ' and ' + weekEnd);
@@ -425,12 +445,10 @@ const FreshBot = {
     // Start up DB connection
     await DB.init();
     
-    // 1) Process incoming messages and record any new subscriptions/unsubscriptions. Let all users register before moving on to creating posts/messages
-    // 2) Update scores on previously loaded posts
-    // 3) Populate new posts into database
+    // Process incoming messages and record any new subscriptions/unsubscriptions. Let all users register before moving on to creating posts/messages
+    // Populate new posts into database
     await Promise.all([
       FreshBot.processPrivateMessages(),
-      //FreshBot.updateScores(),
       FreshBot.fetchNewPosts()
     ]);
     
@@ -438,8 +456,8 @@ const FreshBot = {
     logger.info('Loaded posts up to ' + endDate);
     
     // Wait on days to be completed before moving to week processing as week processing will purge DB
-    //await FreshBot.generateDailyMessages(endDate);
-    //await FreshBot.generateWeeklyMessagesAndPost(endDate);
+    await FreshBot.generateDailyMessages(endDate);
+    await FreshBot.generateWeeklyMessagesAndPost(endDate);
     
     await DB.close();
     process.exit(0);
