@@ -80,6 +80,7 @@ const Template = {
   introDaily: 'Welcome to The Daily Freshness! Fresh /r/hiphopheads posts delivered right to your inbox each day.\n\n',
   introWeekly: 'Welcome to The Weekly Freshness! Fresh /r/hiphopheads posts delivered right to your inbox each week.\n\n',
   tableHeader: 'Post | Link | Score | User\n:--|:--|:--|:--|\n',
+  //TODO: fix feedback link in footer
   footer: `
 
 ---
@@ -345,7 +346,7 @@ const FreshBot = {
     logger.info('Sending weekly message');
     
     logger.debug('Subject: ' + subject);
-    logger.debug('Contents:\n' + message);
+    logger.debug('Contents:\n' + JSON.stringify(messages));
     
     const messagesSent = [];
     const subs = await DB.getDailySubscribers();
@@ -366,7 +367,52 @@ const FreshBot = {
   },
   
   makeWeeklyPost: async function(posts, weekStart) {
-    //TODO
+    // Group posts by day
+    const groupedPosts = posts.reduce((r, post) => {
+      r[post.day] = r[post.day] || [];
+      r[post.day].push(post);
+      return r;
+    }, Object.create(null));
+    
+    const messages = [];
+    let message = '';
+    for (var day in groupedPosts) {
+      let dayTable = '**' + day.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + '**\n\n';
+      dayTable += await FreshBot.formatPostsToTable(groupedPosts[day]);
+      
+      if (message.length + dayTable.length + Template.footer.length > (messages.length === 0 ? config.reddit.SELF_POST_MAX_LENGTH : config.reddit.COMMENT_MAX_LENGTH)) {
+        message = '**Part ' + (messages.length + 1) + '**\n\n' + message + Template.footer;
+        messages.push(message);
+        message = dayTable;
+      } else {
+        message += dayTable;
+      }
+    }
+    message = (messages.length == 0 ? '' :  '**Part ' + (messages.length + 1) + '**\n\n') + message + Template.footer;
+    messages.push(message);
+    
+    const title = 'The Weekly [Fresh]ness - week of ' + weekStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    
+    logger.info('Making weekly post');
+    
+    logger.debug('Title: ' + title);
+    logger.debug('Posts:\n' + JSON.stringify(messages));
+    
+    // Submit post with weekly roundup
+    const postsSent = [
+      reddit.submitSelfPost({
+        subredditName: 'testingground4bots', //'hiphopheads',
+        title: title,
+        text: messages[0]
+      })
+    ];
+    
+    // Add any remaining days as comments on the post
+    for (let i = 1, len = messages.length; i < len; i++) {
+      postsSent.push(postsSent[0].reply(messages[i]));
+    }
+    
+    return Promise.all(postsSent);
   },
   
   generateDailyMessages: async function(endDate) {
