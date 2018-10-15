@@ -142,7 +142,6 @@ const DB = {
   },
   
   insertPosts: async function(posts) {
-    logger.info('Adding ' + posts.length + ' new posts to DB');
     const postsAsArray = posts.map(post => ([post.day, post.id, post.title, post.permalink, post.url, post.author.name, post.created_utc, post.score]));
     const query = pgformat('INSERT INTO posts(day, id, title, permalink, url, author, created_utc, score) VALUES %L ON CONFLICT(id) DO UPDATE SET score = EXCLUDED.score', postsAsArray);
     logger.debug(query);
@@ -234,7 +233,11 @@ const FreshBot = {
     logger.info('Previously fetched up to ' + startDate);
     
     // Get any new posts since then and add to posts table in DB
-    return DB.insertPosts(await FreshBot.getNewPostsFromReddit(maxTimeInDB));
+    const posts = await FreshBot.getNewPostsFromReddit(maxTimeInDB);
+    logger.info('Adding ' + posts.length + ' new posts to DB');
+    if (posts.length > 0) {
+      return DB.insertPosts(posts);
+    }
   },
   
   processPrivateMessagesForUser: async function(PMs) {
