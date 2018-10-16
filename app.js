@@ -1,12 +1,15 @@
 'use strict';
-const snoowrap = require('snoowrap');
-const pg       = require('pg');
-const pgformat = require('pg-format');
-const winston  = require('winston');
-const mdescape = require('markdown-escape');
+const snoowrap     = require('snoowrap');
+const pg           = require('pg');
+const pgformat     = require('pg-format');
+const winston      = require('winston');
+const mdescape     = require('markdown-escape');
+const octokitrest  = require('@octokit/rest');
+const jsonwebtoken = require('jsonwebtoken');
 
 // Built for PostgreSQL 10 and Node 10.12.0
-//
+// Running on Heroku (https://devcenter.heroku.com/articles/scheduler)
+
 // To upgrade c9.io to PostgreSQL 10:
 //    sudo apt-get install -y dpkg
 //    sudo service postgresql stop
@@ -46,7 +49,16 @@ const config = {
     SELF_POST_MAX_LENGTH: process.env.REDDIT_SELF_POST_MAX_LENGTH || 39500,
     COMMENT_MAX_LENGTH:   process.env.REDDIT_COMMENT_MAX_LENGTH || 9500
   },
-  DB_URL:    process.env.DATABASE_URL || process.env.DB_URL,
+  github: {
+    PEM:             process.env.GITHUB_PEM,
+    APP_ID:          process.env.GITHUB_APP_ID,
+    INSTALLATION_ID: process.env.GITHUB_INSTALLATION_ID,
+    NAME:            process.env.GITHUB_NAME,
+    EMAIL:           process.env.GITHUB_EMAIL,
+    REPO:            process.env.GITHUB_REPO,
+    REPO_OWNER:      process.env.GITHUB_REPO_OWNER
+  },
+  DB_URL:    process.env.DATABASE_URL,
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
   MIN_SCORE: process.env.MIN_SCORE || 25
 };
@@ -94,6 +106,56 @@ Template.replyToUnknown = "I couldn't understand this message. Please use one of
 Template.dailySubSuccess = 'You have been subscribed to the daily mailing list!' + Template.footer;
 Template.weeklySubSuccess = 'You have been subscribed to the weekly mailing list!' + Template.footer;
 Template.unsubscribeSuccess = 'You have been unsubscribed from all mailing lists. Sorry to see you go!' + Template.footer;
+
+const GitHub = {
+  addPostsToRepo: async function(posts, dayStart) {
+    const dayString = dayStart.toYYYYMMDD();
+    const filepath = 'docs/daily/' + dayString + '.json';
+    const contents = JSON.stringify(posts);
+    const message = 'Automated push of [FRESH] posts for ' + dayString;
+    
+    logger.info('Pushing posts for ' + dayString + ' to GitHub');
+    
+    return GitHub.pushFileToRepo(filepath, contents, message);
+  },
+  
+  pushFileToRepo: async function(filepath, contents, message) {
+    logger.debug('Authenticating to GitHub');
+    
+    const octokit = octokitrest();
+    octokit.authenticate({
+      type: 'app',
+      token: await GitHub.generateJsonWebToken()
+    });
+    const { data: { token } } = await octokit.apps.createInstallationToken({
+      installation_id: config.github.INSTALLATION_ID
+    });
+    octokit.authenticate({ type: 'token', token });
+    
+    logger.debug('Successfully authenticated to GitHub');
+    
+    return octokit.repos.createFile({
+      owner: config.github.REPO_OWNER,
+      repo: config.github.REPO,
+      message: message,
+      path: filepath,
+      content: Buffer.from(contents).toString('base64'),
+      name: config.github.NAME,
+      email: config.github.EMAIL
+    });
+  },
+  
+  generateJsonWebToken: async function() {
+    // Sign with RSA SHA256
+    const payload = {
+      iat: Math.floor(new Date() / 1000),
+      exp: Math.floor(new Date() / 1000) + 500,
+      iss: config.github.APP_ID
+    };
+    return jsonwebtoken.sign(payload, config.github.PEM, { algorithm: 'RS256' });
+  }
+
+};
 
 const DB = {
   client: new pg.Client({ connectionString: config.DB_URL }),
@@ -417,8 +479,8 @@ const FreshBot = {
     return Promise.all(postsSent);
   },
   
-  generateDailyMessages: async function(endDate) {
-    // Generate daily messages to subscribers
+  doDailyTasks: async function(endDate) {
+    // Generate daily messages to subscribers and send posts to GitHub
     const minUnsentDate = await DB.getMinUnsentDate();
     logger.info('Daily messages sent up to ' + minUnsentDate);
     
@@ -433,8 +495,9 @@ const FreshBot = {
       const dayEnd = dayStart.addDays(1);
       logger.info('Processing day between ' + dayStart + ' and ' + dayEnd);
       
-      // Get days posts and send any messages
+      // Get days posts, add to repo, and send messages to suscribers
       const postsFetched = DB.getPostsForDay(dayStart);
+      sentDaysDone.push(postsFetched.then(posts => GitHub.addPostsToRepo(posts, dayStart)));
       sentDaysDone.push(postsFetched.then(posts => FreshBot.sendDailyMessages(posts, dayStart)));
       
       // Update DB to mark this day sent
@@ -443,7 +506,7 @@ const FreshBot = {
     return Promise.all(sentDaysDone);
   },
   
-  generateWeeklyMessagesAndPost: async function(endDate) {
+  doWeeklyTasks: async function(endDate) {
     // Generate weekly messages to subscribers and post to r/hiphopheads
     // Check if weekly messages and post needs to be sent
     const sentWeeksDone = [];
@@ -504,8 +567,8 @@ const FreshBot = {
     logger.info('Loaded posts up to ' + endDate);
     
     // Wait on days to be completed before moving to week processing as week processing will purge DB
-    await FreshBot.generateDailyMessages(endDate);
-    await FreshBot.generateWeeklyMessagesAndPost(endDate);
+    await FreshBot.doDailyTasks(endDate);
+    await FreshBot.doWeeklyTasks(endDate);
     
     await DB.close();
     process.exit(0);
@@ -540,5 +603,3 @@ process.on('uncaughtException', (error) => {
 });
 
 FreshBot.start();
-// https://devcenter.heroku.com/articles/scheduler
-// Make sure process is scaled to worker=1 so that it doesn't kick off multiple jobs at the same time
