@@ -24,7 +24,7 @@ const jsonwebtoken = require('jsonwebtoken');
 //    psql
 //    CREATE ROLE ubuntu SUPERUSER LOGIN REPLICATION CREATEDB CREATEROLE;
 //    CREATE DATABASE ubuntu OWNER ubuntu;
-//    CREATE DATABASE freshbot OWNER ubuntu;
+//    CREATE DATABASE freshbot OWNER ubuntu; (optional)
 //    \password ubuntu
 //    \q
 //    exit
@@ -47,7 +47,8 @@ const config = {
     ADMIN:                process.env.REDDIT_ADMIN_USER,
     PM_MAX_LENGTH:        process.env.REDDIT_PM_MAX_LENGTH || 9500, // Current reddit limits are 10k char for PM and comment and 40k char for self post but defaults will undershoot those slightly
     SELF_POST_MAX_LENGTH: process.env.REDDIT_SELF_POST_MAX_LENGTH || 39500,
-    COMMENT_MAX_LENGTH:   process.env.REDDIT_COMMENT_MAX_LENGTH || 9500
+    COMMENT_MAX_LENGTH:   process.env.REDDIT_COMMENT_MAX_LENGTH || 9500,
+    DEBUG_MODE:           process.env.REDDIT_DEBUG_MODE // true or false/missing
   },
   github: {
     PEM:             process.env.GITHUB_PEM,
@@ -85,7 +86,7 @@ reddit.config({
   requestDelay: 0,
   continueAfterRatelimitError: true,
   maxRetryAttempts: 5,
-  //debug: config.LOG_LEVEL === 'debug'
+  debug: config.reddit.DEBUG_MODE
 });
 
 const Template = {
@@ -106,6 +107,8 @@ Template.replyToUnknown = "I couldn't understand this message. Please use one of
 Template.dailySubSuccess = 'You have been subscribed to the daily mailing list!' + Template.footer;
 Template.weeklySubSuccess = 'You have been subscribed to the weekly mailing list!' + Template.footer;
 Template.unsubscribeSuccess = 'You have been unsubscribed from all mailing lists. Sorry to see you go!' + Template.footer;
+
+//==============================================================================
 
 const GitHub = {
   addPostsToRepo: async function(posts, dayStart) {
@@ -154,8 +157,9 @@ const GitHub = {
     };
     return jsonwebtoken.sign(payload, config.github.PEM, { algorithm: 'RS256' });
   }
-
 };
+
+//==============================================================================
 
 const DB = {
   client: new pg.Client({ connectionString: config.DB_URL }),
@@ -257,6 +261,8 @@ const DB = {
     return DB.client.end();
   }
 };
+
+//==============================================================================
 
 const FreshBot = {
   scoresUpdated: false,
@@ -575,6 +581,8 @@ const FreshBot = {
   }
 };
 
+//==============================================================================
+
 Date.prototype.addDays = function (days) {
   const newDate = new Date(this);
   newDate.setDate(newDate.getDate() + days);
@@ -601,5 +609,7 @@ process.on('uncaughtException', (error) => {
   logger.error(error);
   process.exit(1);
 });
+
+//==============================================================================
 
 FreshBot.start();
