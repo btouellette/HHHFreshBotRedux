@@ -61,7 +61,8 @@ const config = {
   },
   DB_URL:    process.env.DATABASE_URL,
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
-  MIN_SCORE: process.env.MIN_SCORE || 25
+  MIN_SCORE: process.env.MIN_SCORE || 25,
+  DEV_ENV: process.env.DEV_ENV
 };
 
 const logger = winston.createLogger({
@@ -310,6 +311,10 @@ const FreshBot = {
   },
   
   processPrivateMessagesForUser: async function(PMs) {
+    if (config.DEV_ENV) {
+      return;
+    }
+    
     // Process PMs in order received
     const sortedPMs = PMs.sort((a, b) => { return a.created_utc - b.created_utc; });
 
@@ -502,10 +507,12 @@ const FreshBot = {
       logger.info('Processing day between ' + dayStart + ' and ' + dayEnd);
       
       // Get days posts, add to repo, and send messages to suscribers
-      const postsFetched = DB.getPostsForDay(dayStart);
-      const postsAboveMinScoreFetched = postsFetched.filter(post => post.score >= config.MIN_SCORE);
-      sentDaysDone.push(postsFetched.then(posts => GitHub.addPostsToRepo(posts, dayStart)));
-      sentDaysDone.push(postsAboveMinScoreFetched.then(posts => FreshBot.sendDailyMessages(posts, dayStart)));
+      const posts = await DB.getPostsForDay(dayStart);
+      const postsAboveMinScore = posts.filter(post => post.score >= config.MIN_SCORE);
+      if (!config.DEV_ENV) {
+        sentDaysDone.push(GitHub.addPostsToRepo(posts, dayStart));
+        sentDaysDone.push(FreshBot.sendDailyMessages(postsAboveMinScore, dayStart));
+      }
       
       // Update DB to mark this day sent
       sentDaysDone.push(DB.markDaySent(dayStart));
@@ -528,9 +535,11 @@ const FreshBot = {
       logger.info('Processing week between ' + weekStart + ' and ' + weekEnd);
       
       // Get weeks posts, send messages, and post to r/hiphopheads
-      const postsAboveMinScoreFetched = DB.getPostsForWeek(weekStart, weekEnd).filter(post => post.score >= config.MIN_SCORE);
-      sentWeeksDone.push(postsAboveMinScoreFetched.then(posts => FreshBot.sendWeeklyMessages(posts, weekStart)));
-      sentWeeksDone.push(postsAboveMinScoreFetched.then(posts => FreshBot.makeWeeklyPost(posts, weekStart)));
+      const postsAboveMinScore = (await DB.getPostsForWeek(weekStart, weekEnd)).filter(post => post.score >= config.MIN_SCORE);
+      if (!config.DEV_ENV) {
+        sentWeeksDone.push(FreshBot.sendWeeklyMessages(postsAboveMinScore, weekStart));
+        sentWeeksDone.push(FreshBot.makeWeeklyPost(postsAboveMinScore, weekStart));
+      }
       
       // Purge DB of previous week's data
       sentWeeksDone.push(DB.purgeDays(weekStart, weekEnd));
