@@ -282,7 +282,7 @@ const FreshBot = {
                            sort: 'new',
                            time: timeFilter })
                  .fetchAll()
-                 .filter(post => post.created_utc >= maxTimeInDB && post.title.match(/[\[\(\{]FRESH/i)) // filter out any posts already inserted into the DB or that don't actually have a FRESH tag (reddit search is not exact)
+                 .filter(post => post.created_utc >= maxTimeInDB && post.title.match(/[\[\(\{]\s*FRESH/i)) // filter out any posts already inserted into the DB or that don't actually have a FRESH tag (reddit search is not exact)
                  .map(post => ({  
                    day: new Date(post.created_utc * 1000).toYYYYMMDD(),
                    id: post.id,
