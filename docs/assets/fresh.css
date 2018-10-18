@@ -1,0 +1,36 @@
+.day-container > h2 {
+    text-align: center;
+}
+
+html { 
+    font-family: 'Suez One', serif;
+    background-color: #2F4550;
+    color: #D4F5F5;
+}
+
+.header > h1 {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.gochi {
+    font-family: 'Gochi Hand', cursive;
+    font-size: 150%;
+}
+
+div.embedly-card {
+    padding-bottom: 20px;
+}
+
+iframe.embedly-card { 
+    background-color: #FCFAF9;
+    border-radius: 10px;
+}
+
+.settings-menu-container {
+    text-align: center;
+}
+
+.settings-menu {
+    display: inline-block;
+}

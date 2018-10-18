@@ -114,7 +114,7 @@ const GitHub = {
   addPostsToRepo: async function(posts, dayStart) {
     const dayString = dayStart.toYYYYMMDD();
     const filepath = 'docs/daily/' + dayString + '.json';
-    const contents = JSON.stringify(posts);
+    const contents = JSON.stringify(posts, null, 2);
     const message = 'Automated push of [FRESH] posts for ' + dayString;
     
     logger.info('Pushing posts for ' + dayString + ' to GitHub');
@@ -166,7 +166,8 @@ const DB = {
   
   getMaxTimestamp: async function() {
     // If no posts added yet start with last Sunday
-    return DB.client.query("SELECT COALESCE(MAX(created_utc), EXTRACT(epoch from current_date - cast(extract(dow from current_date) as int))) as max_time FROM posts").then(res => res.rows[0].max_time);
+    const query = "SELECT COALESCE(MAX(created_utc), EXTRACT(epoch from current_date - cast(extract(dow from current_date) as int))) as max_time FROM posts";
+    return DB.client.query(query).then(res => res.rows[0].max_time);
   },
   
   getMinDate: async function() {
@@ -196,13 +197,13 @@ const DB = {
   },
   
   getPostsForDay: async function(date) {
-    const query = pgformat('SELECT * FROM posts WHERE day = %L AND score >= %L ORDER BY score DESC', date.toYYYYMMDD(), config.MIN_SCORE);
+    const query = pgformat('SELECT * FROM posts WHERE day = %L ORDER BY score DESC', date.toYYYYMMDD());
     logger.debug(query);
     return DB.client.query(query).then(res => res.rows);
   },
   
   getPostsForWeek: async function(startDate, endDate) {
-    const query = pgformat('SELECT * FROM posts WHERE day >= %L AND day < %L AND score >= %L ORDER BY day ASC, score DESC', startDate.toYYYYMMDD(), endDate.toYYYYMMDD(), config.MIN_SCORE);
+    const query = pgformat('SELECT * FROM posts WHERE day >= %L AND day < %L ORDER BY day ASC, score DESC', startDate.toYYYYMMDD(), endDate.toYYYYMMDD());
     logger.debug(query);
     return DB.client.query(query).then(res => res.rows);
   },
@@ -276,12 +277,12 @@ const FreshBot = {
                                                  'hour';    
     logger.info('Fetching new posts from last ' + timeFilter);
     // This will return only ~250 posts (see https://github.com/not-an-aardvark/snoowrap/issues/162)
-    return reddit.search({ query: '[FRESH',
+    return reddit.search({ query: 'title:"FRESH"',
                            subreddit: 'hiphopheads',
                            sort: 'new',
                            time: timeFilter })
                  .fetchAll()
-                 .filter(post => post.created_utc >= maxTimeInDB) // filter out any posts already inserted into the DB
+                 .filter(post => post.created_utc >= maxTimeInDB && post.title.match(/[\[\(\{]FRESH/i)) // filter out any posts already inserted into the DB or that don't actually have a FRESH tag (reddit search is not exact)
                  .map(post => ({  
                    day: new Date(post.created_utc * 1000).toYYYYMMDD(),
                    id: post.id,
@@ -368,11 +369,10 @@ const FreshBot = {
   
   sendDailyMessages: async function(posts, dayStart) {
     let message = Template.introDaily;
-    //message += '**' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + '**\n\n';
     message += await FreshBot.formatPostsToTable(posts);
     message += Template.footer;
     
-    const subject = 'The Daily [Fresh]ness - day of ' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const subject = 'The Daily [Fresh]ness - day of ' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
     
     logger.info('Sending daily message');
     
@@ -397,7 +397,7 @@ const FreshBot = {
     const messages = [];
     let message = '';
     for (var day in groupedPosts) {
-      let dayTable = '**' + day.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + '**\n\n';
+      let dayTable = '**' + day.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '**\n\n';
       dayTable += await FreshBot.formatPostsToTable(groupedPosts[day]);
       
       if (Template.introWeekly.length + message.length + dayTable.length + Template.footer.length > config.reddit.PM_MAX_LENGTH) {
@@ -411,7 +411,7 @@ const FreshBot = {
     message = Template.introWeekly + (messages.length == 0 ? '' :  '**Part ' + (messages.length + 1) + '**\n\n') + message + Template.footer;
     messages.push(message);
     
-    const subject = 'The Weekly [Fresh]ness - week of ' + weekStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const subject = 'The Weekly [Fresh]ness - week of ' + weekStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
     
     logger.info('Sending weekly message');
     
@@ -447,7 +447,7 @@ const FreshBot = {
     const messages = [];
     let message = '';
     for (var day in groupedPosts) {
-      let dayTable = '**' + day.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + '**\n\n';
+      let dayTable = '**' + day.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '**\n\n';
       dayTable += await FreshBot.formatPostsToTable(groupedPosts[day]);
       
       if (message.length + dayTable.length + Template.footer.length > (messages.length === 0 ? config.reddit.SELF_POST_MAX_LENGTH : config.reddit.COMMENT_MAX_LENGTH)) {
@@ -461,7 +461,7 @@ const FreshBot = {
     message = (messages.length == 0 ? '' :  '**Part ' + (messages.length + 1) + '**\n\n') + message + Template.footer;
     messages.push(message);
     
-    const title = 'The Weekly [Fresh]ness - week of ' + weekStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const title = 'The Weekly [Fresh]ness - week of ' + weekStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
     
     logger.info('Making weekly post');
     
@@ -503,8 +503,9 @@ const FreshBot = {
       
       // Get days posts, add to repo, and send messages to suscribers
       const postsFetched = DB.getPostsForDay(dayStart);
+      const postsAboveMinScoreFetched = postsFetched.filter(post => post.score >= config.MIN_SCORE);
       sentDaysDone.push(postsFetched.then(posts => GitHub.addPostsToRepo(posts, dayStart)));
-      sentDaysDone.push(postsFetched.then(posts => FreshBot.sendDailyMessages(posts, dayStart)));
+      sentDaysDone.push(postsAboveMinScoreFetched.then(posts => FreshBot.sendDailyMessages(posts, dayStart)));
       
       // Update DB to mark this day sent
       sentDaysDone.push(DB.markDaySent(dayStart));
@@ -527,9 +528,9 @@ const FreshBot = {
       logger.info('Processing week between ' + weekStart + ' and ' + weekEnd);
       
       // Get weeks posts, send messages, and post to r/hiphopheads
-      const postsFetched = DB.getPostsForWeek(weekStart, weekEnd);
-      sentWeeksDone.push(postsFetched.then(posts => FreshBot.sendWeeklyMessages(posts, weekStart)));
-      sentWeeksDone.push(postsFetched.then(posts => FreshBot.makeWeeklyPost(posts, weekStart)));
+      const postsAboveMinScoreFetched = DB.getPostsForWeek(weekStart, weekEnd).filter(post => post.score >= config.MIN_SCORE);
+      sentWeeksDone.push(postsAboveMinScoreFetched.then(posts => FreshBot.sendWeeklyMessages(posts, weekStart)));
+      sentWeeksDone.push(postsAboveMinScoreFetched.then(posts => FreshBot.makeWeeklyPost(posts, weekStart)));
       
       // Purge DB of previous week's data
       sentWeeksDone.push(DB.purgeDays(weekStart, weekEnd));
@@ -600,6 +601,8 @@ Date.prototype.toYYYYMMDD = function () {
 String.prototype.fromYYYYMMDDtoDate = function () {
   return new Date(Date.UTC(this.substring(0, 4), this.substring(4, 6) - 1, this.substring(6, 8)));
 };
+
+//==============================================================================
 
 process.on('unhandledRejection', (reason, p) => {
   // Unhandled promise rejection, since we already have fallback handler for unhandled errors (see below), throw and let him handle that
