@@ -1,5 +1,6 @@
 .day-container > h2 {
     text-align: center;
+    font-size: 1.8rem;
 }
 
 html { 
@@ -11,6 +12,7 @@ html {
 .header > h1 {
     text-align: center;
     margin-bottom: 10px;
+    font-size: 2.5rem;
 }
 
 .gochi {
@@ -20,6 +22,111 @@ html {
 
 div.embedly-card {
     padding-bottom: 20px;
+}
+
+.embedly-card-hug {
+    max-width: 600px;
+    padding: 0px;
+    position: relative;
+    min-width: 200px;
+    margin: 5px auto;
+}
+
+.player {
+    border: none;
+    position: relative;
+    visibility: visible;
+    display: block;
+    margin: 0px;
+    padding: 0px;
+    max-width: 100%;
+    min-width: 200px;
+    border-radius: 10px;
+    padding-bottom: 56.2%;
+    /* Use 75% for 4:3 videos */
+    overflow: hidden;
+    /* remainder of these may not be needed */
+    height: 0;
+}
+
+.player span {
+    position: absolute;
+    margin: auto;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 1.5rem;
+    text-shadow: 
+        /* first layer at 1px */
+        -1px -1px 0px #000,
+         0px -1px 0px #000,
+         1px -1px 0px #000,
+        -1px  0px 0px #000,
+         1px  0px 0px #000,
+        -1px  1px 0px #000,
+         0px  1px 0px #000,
+         1px  1px 0px #000,
+        /* second layer at 2px */
+        -2px -2px 0px #000,
+        -1px -2px 0px #000,
+         0px -2px 0px #000,
+         1px -2px 0px #000,
+         2px -2px 0px #000,
+         2px -1px 0px #000,
+         2px  0px 0px #000,
+         2px  1px 0px #000,
+         2px  2px 0px #000,
+         1px  2px 0px #000,
+         0px  2px 0px #000,
+        -1px  2px 0px #000,
+        -2px  2px 0px #000,
+        -2px  1px 0px #000,
+        -2px  0px 0px #000,
+        -2px -1px 0px #000;
+    z-index: 10;
+}
+
+.player img {
+    bottom: 0;
+    margin: auto;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    cursor: pointer;
+    transition: .4s all;
+    /* remainder of these may not be needed */
+    display: block;
+    left: 0;
+    max-width: 100%;
+    right: 0;
+    border: none;
+    height: auto;
+}
+    
+.player iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 100;
+    background: transparent;
+}
+    
+.player img:hover {
+    -webkit-filter: brightness(75%);
+}
+
+.player .play {
+    height: 72px;
+    width: 72px;
+    left: 50%;
+    top: 50%;
+    margin-left: -36px;
+    margin-top: -36px;
+    position: absolute;
+    background: url("//i.imgur.com/TxzC70f.png") no-repeat;
+    cursor: pointer;
 }
 
 iframe.embedly-card { 
