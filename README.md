@@ -2,6 +2,8 @@
 
 This bot compiles [Fresh] posts submitted to /r/hiphopheads. If you want to subscribe, check out these links! - [[Daily](http://www.reddit.com/message/compose/?to=HHHFreshBotRedux&subject=subscribe&message=daily)] [[Weekly](http://www.reddit.com/message/compose/?to=HHHFreshBotRedux&subject=subscribe&message=weekly)]
 
+Posts are also viewable on this repo's GitHub Pages site: https://btouellette.github.io/HHHFreshBotRedux/
+
 ### Functionality:
 * Saves all [Fresh] posts to database, only posts with +25 score sent out or saved
 * Reads messages sent to inbox
