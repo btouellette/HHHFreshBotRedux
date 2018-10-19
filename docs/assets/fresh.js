@@ -1,15 +1,9 @@
 //TODO: check if media is available and don't add card if not
-//TODO: fix reddit HTML escaping of title
-//TODO: don't allow multiple embeds to play at once (reload embed/iframe if you click inside another?), consider not using reddit embeds so we get more control over this and sizing
-//TODO: filter on score
-//TODO: infinite scroll, hash anchor links to days (and to start back where you were), unload previous days after some number of posts?
-//TODO: loading indicator (don't infinite scroll while loading)
-//TODO: iframe performance? maybe click to generate reddit embed?
+//TODO: unload previous days after some number of posts?
 //TODO: remember last visit and provide link to that day?
-//TODO: https://stackoverflow.com/questions/5315659/jquery-change-hash-fragment-identifier-while-scrolling-down-page
 
 /*global fetch*/
-/*global infinity*/
+/*global history*/
 /*global Cookies*/
 /*global $*/
 
@@ -89,7 +83,6 @@ async function findFirstYYYYMMDD() {
         await fetch(currentJSON).then(res => { if(res.ok) { yyyymmdd = currentDate.toYYYYMMDD(); }});
         currentDate = currentDate.addDays(-1);
     }
-    console.log(yyyymmdd);
     return yyyymmdd;
 }
 
@@ -121,20 +114,18 @@ $("#min-score-input").on("keyup keydown change", debounced(1000, function() {
 let isPopulating = false;
 function populatePage(yyyymmdd) {
     isPopulating = true;
-    //TODO: add loading spinner
+    // Spinner disabled for now as this loads very fast
+    // $container.append($('<div class="spinner-container"><div class="spinner"><div class="bounce1"></div><div class="bounce2"></div><div class="bounce3"></div></div></div>'));
     fetch('daily/' + yyyymmdd + '.json').then(res => {
         if (res.ok) {
             res.json().then(json => {
                 lastYYYYMMDD = yyyymmdd;
                 
-                console.log(json);
-                            
                 const dateString = yyyymmdd.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
                 const $dayContainer = $(`<div class="day-container"><h2 id="${yyyymmdd}">${dateString}</h2></div>`);
                 $container.append($dayContainer);
                 
                 json.forEach(post => {
-                    //TODO: add these in more slowly (on scroll?) to give embeds in view more time to load properly
                     //TODO: if wrapper fails add reddit embed
                     const wrapStart = `<div class="grid-item" ${getScoreDataAttr(post)}><div class="embedly-card"><div class="embedly-card-hug">`;
                     const wrapEnd = '</div></div></div>';
@@ -142,7 +133,6 @@ function populatePage(yyyymmdd) {
                     if (post.url.includes('youtube.com') || post.url.includes('youtu.be')) {
                         
                         // YouTube embeds
-                        //TODO: add title
                         //TODO: if fetch on thumbnail fails don't add to list
                         const ytID = getYoutubeID(post.url);
                         const $newElement = $(wrapStart + `<div class="player youtube-player" data-id="${ytID}"><div data-id="${ytID}"><span>${removeFreshTag(post.title)}</span><img src="https://i.ytimg.com/vi/${ytID}/hqdefault.jpg"><div class="play"></div></div></div>` + wrapEnd);
@@ -154,7 +144,6 @@ function populatePage(yyyymmdd) {
                         const widget_options = '';
                         $.getJSON('https://soundcloud.com/oembed.json?url=' + post.url + widget_options)
                          .done(function (oembedData) { 
-                            console.log(oembedData); 
                             if (oembedData.thumbnail_url.includes('placeholder')) {
                                 const soundcloudClientID = 'LvWovRaJZlWCHql0bISuum8Bd2KX79mb';
                                 $.getJSON(`https://api.soundcloud.com/resolve.json?client_id=${soundcloudClientID}&url=${post.url}`)
@@ -192,29 +181,47 @@ function populatePage(yyyymmdd) {
                         
                     }
                 });
+                $('.spinner').remove();
                 isPopulating = false;
             });
         } else {
             console.log('Request for daily/' + yyyymmdd + '.json failed');
             const $dayContainer = $(`<div class="day-container"><h2 id="${yyyymmdd}">End of archived posts</h2></div>`);
             $container.append($dayContainer);
+            // $('.spinner').remove();
         }
     });
 }
 
 findFirstYYYYMMDD().then(yyyymmdd => {
     firstYYYYMMDD = yyyymmdd;
-    if (window.location.hash) {
+    if (window.location.hash && window.location.hash.substr(1) !== firstYYYYMMDD) {
         yyyymmdd = window.location.hash.substr(1);
+        //TODO: add back button to load previous page
     }
     populatePage(yyyymmdd);
 });
 
-//TODO: allow scroll upwards if starting with #
-
 $(window).scroll(function() {
-   if(!isPopulating && $(window).scrollTop() + $(window).height() > $(document).height() - 400) {
+    if(!isPopulating && $(window).scrollTop() + $(window).height() > $(document).height() - 400) {
         let yyyymmdd = lastYYYYMMDD.fromYYYYMMDDtoDate().addDays(-1).toYYYYMMDD();
         populatePage(yyyymmdd);
-   }
+    }
+   
+   // Set hash based on which header we are below, don't add to history
+    var st = window.pageYOffset || document.documentElement.scrollTop;
+    var dayTops = $('.day-container > h2').map(function(){ return { top: $(this).offset().top, id: $(this).attr('id') }}).get();
+    for(let i = 0, len = dayTops.length; i < len; i++) {
+        if (i == 0 && st < dayTops[0].top) {
+            if (window.location.hash !== '') {
+                history.replaceState(null, null, ' ');
+            }
+            break;
+        } else if (i == len - 1 || st > dayTops[i].top && st < dayTops[i + 1].top) {
+            if (window.location.hash !== '#' + dayTops[i].id) {
+                history.replaceState(null, null, '#' + dayTops[i].id);
+            }
+            break;
+        }
+    }
 });
