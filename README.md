@@ -1,18 +1,18 @@
 # HHHFreshBotRedux
 
-This bot compiles [Fresh] posts submitted to /r/hiphopheads. If you want to subscribe, check out these links! - [[Daily](http://www.reddit.com/message/compose/?to=HHHFreshBotRedux&subject=subscribe&message=daily)] [[Weekly](http://www.reddit.com/message/compose/?to=HHHFreshBotRedux&subject=subscribe&message=weekly)]
+This bot compiles [FRESH] posts submitted to /r/hiphopheads. If you want to subscribe, check out these links! - [[Daily](http://www.reddit.com/message/compose/?to=HHHFreshBotRedux&subject=subscribe&message=daily)] [[Weekly](http://www.reddit.com/message/compose/?to=HHHFreshBotRedux&subject=subscribe&message=weekly)]
 
 Posts are also viewable on this repo's GitHub Pages site: https://btouellette.github.io/HHHFreshBotRedux/
 
 ### Functionality:
-* Saves all [Fresh] posts to database, only posts with +25 score sent out or saved
+* Saves all [FRESH] posts to database, only posts with +25 score sent out in messages
 * Reads messages sent to inbox
 	* If it's a subscribe request, it subscribes the user to either the daily or weekly round up (possible to subscribe to both if you send each one once)
 	* If it's a unsubscribe request, it unsubscribes the user from both round ups
 * Send out the daily round up to all subscribed users
 * Send out the weekly round up to all subscribed users
 * Post the weekly round up to /r/hiphopheads
-* Save the weeks [Fresh] posts to this GitHub repo
+* Save the weeks [FRESH] posts to this GitHub repo
 
 Inspired by hizinfiz's [HHHFreshBot](https://github.com/hizinfiz/HHHFreshBot) (in spirit and look if not in code)
 
