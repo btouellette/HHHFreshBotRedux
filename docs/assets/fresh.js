@@ -93,7 +93,7 @@ async function findFirstYYYYMMDD() {
     return yyyymmdd;
 }
 
-let firstYYYYMMDD = null;
+let firstYYYYMMDD = null, lastYYYYMMDD = null;
 const $container = $("#embed-container");
 let minScore = parseInt(Cookies.get('minScore'), 10) || 25;
 
@@ -118,16 +118,16 @@ $("#min-score-input").on("keyup keydown change", debounced(1000, function() {
     }
 }));
 
-findFirstYYYYMMDD().then(yyyymmdd => {
-    firstYYYYMMDD = yyyymmdd;
-    if (window.location.hash) {
-        yyyymmdd = window.location.hash.substr(1);
-    }
+let isPopulating = false;
+function populatePage(yyyymmdd) {
+    isPopulating = true;
     fetch('daily/' + yyyymmdd + '.json').then(res => {
         if (res.ok) {
             res.json().then(json => {
-                console.log(json);
+                lastYYYYMMDD = yyyymmdd;
                 
+                console.log(json);
+                            
                 const dateString = yyyymmdd.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
                 const $dayContainer = $(`<div class="day-container"><h2 id="${yyyymmdd}">${dateString}</h2></div>`);
                 $container.append($dayContainer);
@@ -191,15 +191,27 @@ findFirstYYYYMMDD().then(yyyymmdd => {
                         
                     }
                 });
+                isPopulating = false;
             });
         } else {
             console.log('Request for daily/' + yyyymmdd + '.json failed');
         }
     });
+}
+
+findFirstYYYYMMDD().then(yyyymmdd => {
+    firstYYYYMMDD = yyyymmdd;
+    if (window.location.hash) {
+        yyyymmdd = window.location.hash.substr(1);
+    }
+    populatePage(yyyymmdd);
 });
 
+//TODO: allow scroll upwards if starting with #
+
 $(window).scroll(function() {
-   if($(window).scrollTop() + $(window).height() > $(document).height() - 200) {
-       //alert("near bottom!");
+   if(!isPopulating && $(window).scrollTop() + $(window).height() > $(document).height() - 400) {
+        let yyyymmdd = lastYYYYMMDD.fromYYYYMMDDtoDate().addDays(-1).toYYYYMMDD();
+        populatePage(yyyymmdd);
    }
 });
