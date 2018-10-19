@@ -121,6 +121,7 @@ $("#min-score-input").on("keyup keydown change", debounced(1000, function() {
 let isPopulating = false;
 function populatePage(yyyymmdd) {
     isPopulating = true;
+    //TODO: add loading spinner
     fetch('daily/' + yyyymmdd + '.json').then(res => {
         if (res.ok) {
             res.json().then(json => {
@@ -195,6 +196,8 @@ function populatePage(yyyymmdd) {
             });
         } else {
             console.log('Request for daily/' + yyyymmdd + '.json failed');
+            const $dayContainer = $(`<div class="day-container"><h2 id="${yyyymmdd}">End of archived posts</h2></div>`);
+            $container.append($dayContainer);
         }
     });
 }
