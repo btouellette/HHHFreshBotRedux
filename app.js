@@ -102,7 +102,7 @@ const Template = {
 
 ^Subscribe ^to ^roundups: ^[[Daily](http://www.reddit.com/message/compose/?to=HHHFreshBotRedux&subject=subscribe&message=daily)] ^[[Weekly](http://www.reddit.com/message/compose/?to=HHHFreshBotRedux&subject=subscribe&message=weekly)] ^[[Unsubscribe](http://www.reddit.com/message/compose/?to=HHHFreshBotRedux&subject=unsubscribe&message=remove)]
 
-^[[Info/Source](https://github.com/btouellette/HHHFreshBotRedux)] ^[[Feedback](http://www.reddit.com/message/compose/?to=${config.reddit.ADMIN}&subject=%2Fu%2FHHHFreshBotRedux%20feedback&message=If%20you%20are%20providing%20feedback%20about%20a%20specific%20post%2C%20please%20include%20the%20link%20to%20that%20post.%20Thanks!)]`,
+^[[Site](https://btouellette.github.io/HHHFreshBotRedux/)] ^[[Info/Source](https://github.com/btouellette/HHHFreshBotRedux)] ^[[Feedback](http://www.reddit.com/message/compose/?to=${config.reddit.ADMIN}&subject=%2Fu%2FHHHFreshBotRedux%20feedback&message=If%20you%20are%20providing%20feedback%20about%20a%20specific%20post%2C%20please%20include%20the%20link%20to%20that%20post.%20Thanks!)]`,
 };
 Template.replyToUnknown = "I couldn't understand this message. Please use one of the links below to subscribe, unsubscribe, or send feedback!" + Template.footer;
 Template.dailySubSuccess = 'You have been subscribed to the daily mailing list!' + Template.footer;
