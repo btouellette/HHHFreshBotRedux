@@ -57,7 +57,8 @@ const config = {
     NAME:            process.env.GITHUB_NAME,
     EMAIL:           process.env.GITHUB_EMAIL,
     REPO:            process.env.GITHUB_REPO,
-    REPO_OWNER:      process.env.GITHUB_REPO_OWNER
+    REPO_OWNER:      process.env.GITHUB_REPO_OWNER,
+    PAGES_LINK:      process.env.GITHUB_PAGES_LINK
   },
   DB_URL:    process.env.DATABASE_URL,
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
@@ -374,6 +375,7 @@ const FreshBot = {
   
   sendDailyMessages: async function(posts, dayStart) {
     let message = Template.introDaily;
+    message += '**[' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.GITHUB_PAGES_LINK + '#' + dayStart.toYYYYMMDD() + ')**\n\n';
     message += await FreshBot.formatPostsToTable(posts);
     message += Template.footer;
     
@@ -402,7 +404,7 @@ const FreshBot = {
     const messages = [];
     let message = '';
     for (var day in groupedPosts) {
-      let dayTable = '**' + day.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '**\n\n';
+      let dayTable = '**[' + day.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.GITHUB_PAGES_LINK + '#' + day + ')**\n\n';
       dayTable += await FreshBot.formatPostsToTable(groupedPosts[day]);
       
       if (Template.introWeekly.length + message.length + dayTable.length + Template.footer.length > config.reddit.PM_MAX_LENGTH) {
