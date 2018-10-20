@@ -375,7 +375,7 @@ const FreshBot = {
   
   sendDailyMessages: async function(posts, dayStart) {
     let message = Template.introDaily;
-    message += '**[' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.GITHUB_PAGES_LINK + '#' + dayStart.toYYYYMMDD() + ')**\n\n';
+    message += '**[' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + dayStart.toYYYYMMDD() + ')**\n\n';
     message += await FreshBot.formatPostsToTable(posts);
     message += Template.footer;
     
@@ -404,7 +404,7 @@ const FreshBot = {
     const messages = [];
     let message = '';
     for (var day in groupedPosts) {
-      let dayTable = '**[' + day.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.GITHUB_PAGES_LINK + '#' + day + ')**\n\n';
+      let dayTable = '**[' + day.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + day + ')**\n\n';
       dayTable += await FreshBot.formatPostsToTable(groupedPosts[day]);
       
       if (Template.introWeekly.length + message.length + dayTable.length + Template.footer.length > config.reddit.PM_MAX_LENGTH) {

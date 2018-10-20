@@ -38,7 +38,19 @@ function debounced(delay, fn) {
 }
 
 function getYoutubeID(url){
-    var regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#\&\?\/]*).*/;
+    // matches:
+    // https://m.youtube.com/watch?v=88H9gvfVfIU
+    // https://youtu.be/uH9m5CVqAiE?t=1
+    // https://youtu.be/4cSsBkp7ziw
+    // https://www.youtube.com/watch?v=xgC3MdDvJy4&feature=youtu.be
+    // https://www.youtube.com/watch?v=RQI2K5B9sTc
+    // https://www.youtube.com/watch?time_continue=1&v=Izb8iXWqHTs
+    // https://www.youtube.com/watch?v=2-VWwF2yn_U&frags=pl%2Cwn
+    // https://www.youtube.com/watch?v=fzV_QZODisQ&ab_channel=LilPeep
+    // https://www.youtube.com/watch?v=LOBv-1-6cNw&fbclid=IwAR2zPvBp8suY16QKDmsIkvHWk1pUmarxOTqI0S_FDA-z-MdITOXxcxlF6Ps
+    // https://www.youtube.com/watch?v=dDpkiptRHAw&t=0s&list=PL2vg1YHilh9DxS9KFyTV_A5Hf0c6cEGfk&index=5
+    //TODO: fails if this one's arguments are out of order
+    var regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??(?:time_continue=\d+?&)?v?=?([^#\&\?\/]*).*/;
     var match = url.match(regExp);
     if (!match || match[7].length !== 11) {
         console.log('Failed to extract Youtube ID from ' + url);
@@ -112,7 +124,7 @@ $("#min-score-input").on("keyup keydown change", debounced(1000, function() {
 }));
 
 let isPopulating = false;
-function populatePage(yyyymmdd) {
+function populatePage(yyyymmdd, prepend) {
     isPopulating = true;
     // Spinner disabled for now as this loads very fast
     // $container.append($('<div class="spinner-container"><div class="spinner"><div class="bounce1"></div><div class="bounce2"></div><div class="bounce3"></div></div></div>'));
@@ -123,7 +135,11 @@ function populatePage(yyyymmdd) {
                 
                 const dateString = yyyymmdd.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
                 const $dayContainer = $(`<div class="day-container"><h2 id="${yyyymmdd}">${dateString}</h2></div>`);
-                $container.append($dayContainer);
+                if (prepend) {
+                    $container.prepend($dayContainer);
+                } else {
+                    $container.append($dayContainer);
+                }
                 
                 json.forEach(post => {
                     //TODO: if wrapper fails add reddit embed
@@ -136,7 +152,7 @@ function populatePage(yyyymmdd) {
                         //TODO: if fetch on thumbnail fails don't add to list
                         const ytID = getYoutubeID(post.url);
                         const $newElement = $(wrapStart + `<div class="player youtube-player" data-id="${ytID}"><div data-id="${ytID}"><span>${removeFreshTag(post.title)}</span><img src="https://i.ytimg.com/vi/${ytID}/hqdefault.jpg"><div class="play"></div></div></div>` + wrapEnd);
-                        $container.append($newElement);
+                        $dayContainer.append($newElement);
                         $newElement.find('.youtube-player > div').on('click', replaceYoutubeWithIFrame);
                         
                     } else if (post.url.includes('soundcloud.com')) {
@@ -159,13 +175,13 @@ function populatePage(yyyymmdd) {
                                         //TODO: see if we can get higher res images here from URL manipulation
                                         artwork_url = artwork_url || oembedData.thumbnail_url;
                                         const $newElement = $(wrapStart + `<div class="player soundcloud-player"><div><span>${removeFreshTag(post.title)}</span><img src="${artwork_url}"><div class="play"></div></div></div>` + wrapEnd);
-                                        $container.append($newElement);
+                                        $dayContainer.append($newElement);
                                         $newElement.find('.soundcloud-player > div').on('click', function() { replaceSoundcloudWithIframe(oembedData.html, this); });
                                     });
                                 });
                             } else {
                                 const $newElement = $(wrapStart + `<div class="player soundcloud-player"><div><span>${removeFreshTag(post.title)}</span><img src="${oembedData.thumbnail_url}"><div class="play"></div></div></div>` + wrapEnd);
-                                $container.append($newElement);
+                                $dayContainer.append($newElement);
                                 $newElement.find('.soundcloud-player > div').on('click', function() { replaceSoundcloudWithIframe(oembedData.html, this); });
                             }
                          });
@@ -177,17 +193,21 @@ function populatePage(yyyymmdd) {
                         
                         // Reddit embeds for everything else (these are much more expensive)
                         const $newElement = $(`<div class="grid-item" ${getScoreDataAttr(post)}><blockquote class="reddit-card" data-card-created="${Math.floor(Date.now() / 1000)}"><a href="https://www.reddit.com${post.permalink}?ref=share&ref_source=embed"></a></blockquote></div>`);
-                        $container.append($newElement);
+                        $dayContainer.append($newElement);
                         
                     }
                 });
-                $('.spinner').remove();
+                // $('.spinner').remove();
                 isPopulating = false;
             });
         } else {
             console.log('Request for daily/' + yyyymmdd + '.json failed');
             const $dayContainer = $(`<div class="day-container"><h2 id="${yyyymmdd}">End of archived posts</h2></div>`);
-            $container.append($dayContainer);
+            if (prepend) {
+                $container.prepend($dayContainer);
+            } else {
+                $container.append($dayContainer);
+            }
             // $('.spinner').remove();
         }
     });
@@ -197,7 +217,17 @@ findFirstYYYYMMDD().then(yyyymmdd => {
     firstYYYYMMDD = yyyymmdd;
     if (window.location.hash && window.location.hash.substr(1) !== firstYYYYMMDD) {
         yyyymmdd = window.location.hash.substr(1);
-        //TODO: add back button to load previous page
+        const $button = $('<div class="back-btn-wrapper"><button class="btn back-btn">Load up</button></div>');
+        $('#main-wrapper').prepend($button);
+        $button.on('click', function() {
+            const currentFirstYYYYMMDD = $('.day-container > h2')[0].id;
+            const yyyymmddForward = currentFirstYYYYMMDD.fromYYYYMMDDtoDate().addDays(1).toYYYYMMDD();
+            this.firstChild.blur();
+            if (yyyymmddForward === firstYYYYMMDD) {
+                $(this).remove();
+            }
+            populatePage(yyyymmddForward, true);
+        });
     }
     populatePage(yyyymmdd);
 });
