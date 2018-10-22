@@ -62,7 +62,7 @@ const config = {
   DB_URL:    process.env.DATABASE_URL,
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
   MIN_SCORE: process.env.MIN_SCORE || 25,
-  DEV_ENV: process.env.DEV_ENV
+  DEV_ENV:   process.env.DEV_ENV
 };
 
 const logger = winston.createLogger({
@@ -403,7 +403,8 @@ const FreshBot = {
     const messages = [];
     let message = '';
     for (var day in groupedPosts) {
-      let dayTable = '**[' + day.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + day + ')**\n\n';
+      const date = new Date(day);
+      let dayTable = '**[' + date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + date.toYYYYMMDD() + ')**\n\n';
       dayTable += await FreshBot.formatPostsToTable(groupedPosts[day]);
       
       if (Template.introWeekly.length + message.length + dayTable.length + Template.footer.length > config.reddit.PM_MAX_LENGTH) {
@@ -453,7 +454,8 @@ const FreshBot = {
     const messages = [];
     let message = '';
     for (var day in groupedPosts) {
-      let dayTable = '**' + day.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '**\n\n';
+      const date = new Date(day);
+      let dayTable = '**[' + date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + date.toYYYYMMDD() + ')**\n\n';
       dayTable += await FreshBot.formatPostsToTable(groupedPosts[day]);
       
       if (message.length + dayTable.length + Template.footer.length > (messages.length === 0 ? config.reddit.SELF_POST_MAX_LENGTH : config.reddit.COMMENT_MAX_LENGTH)) {
