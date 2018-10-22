@@ -477,7 +477,7 @@ const FreshBot = {
     
     // Submit post with weekly roundup
     const postsSent = [
-      reddit.submitSelfPost({
+      reddit.submitSelfpost({
         subredditName: 'testingground4bots', //'hiphopheads',
         title: title,
         text: messages[0]
