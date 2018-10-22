@@ -3,7 +3,6 @@ const snoowrap     = require('snoowrap');
 const pg           = require('pg');
 const pgformat     = require('pg-format');
 const winston      = require('winston');
-const mdescape     = require('markdown-escape');
 const octokitrest  = require('@octokit/rest');
 const jsonwebtoken = require('jsonwebtoken');
 
@@ -367,7 +366,7 @@ const FreshBot = {
   formatPostsToTable: async function(posts) {
     let message = Template.tableHeader;
     posts.forEach(post => {
-      message += '[' + mdescape(post.title).replace('|', '&#124;') + '](' + post.url + ') | [link](' + post.permalink + ') | +' + post.score + ' | /u/' + post.author + '\n';
+      message += '[' + post.title.replace('|', '&#124;') + '](' + post.url + ') | [link](' + post.permalink + ') | +' + post.score + ' | /u/' + post.author + '\n';
     });
     message += '\n';
     return message;
@@ -577,7 +576,7 @@ const FreshBot = {
     // Process incoming messages and record any new subscriptions/unsubscriptions. Let all users register before moving on to creating posts/messages
     // Populate new posts into database
     await Promise.all([
-      FreshBot.processPrivateMessages(),
+      //FreshBot.processPrivateMessages(),
       FreshBot.fetchNewPosts()
     ]);
     
