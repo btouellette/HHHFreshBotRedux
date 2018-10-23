@@ -199,6 +199,11 @@ function populatePage(yyyymmdd, prepend) {
                 });
                 // $('.spinner').remove();
                 isPopulating = false;
+                // If there is no scroll bar go ahead and explicitly trigger a scroll to load the next day
+                if (!prepend && $(document).height() <= $(window).height()) {
+                    // Trigger the scroll event
+                    $(window).scroll();
+                }
             });
         } else {
             console.log('Request for daily/' + yyyymmdd + '.json failed');
