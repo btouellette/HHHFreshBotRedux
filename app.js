@@ -149,6 +149,27 @@ const GitHub = {
     });
   },
   
+  requestPageBuild: async function() {
+    logger.debug('Authenticating to GitHub');
+    
+    const octokit = octokitrest();
+    octokit.authenticate({
+      type: 'app',
+      token: await GitHub.generateJsonWebToken()
+    });
+    const { data: { token } } = await octokit.apps.createInstallationToken({
+      installation_id: config.github.INSTALLATION_ID
+    });
+    octokit.authenticate({ type: 'token', token });
+    
+    logger.debug('Successfully authenticated to GitHub');
+    
+    return octokit.repos.requestPageBuild({
+      owner: config.github.REPO_OWNER,
+      repo: config.github.REPO
+    });
+  },
+  
   generateJsonWebToken: async function() {
     // Sign with RSA SHA256
     const payload = {
@@ -590,6 +611,9 @@ const FreshBot = {
     await FreshBot.doWeeklyTasks(endDate);
     
     await DB.close();
+    
+    await GitHub.requestPageBuild();
+    
     process.exit(0);
   }
 };
