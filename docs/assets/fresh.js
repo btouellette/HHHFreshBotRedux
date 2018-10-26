@@ -48,15 +48,14 @@ function getYoutubeID(url){
     // https://www.youtube.com/watch?v=2-VWwF2yn_U&frags=pl%2Cwn
     // https://www.youtube.com/watch?v=fzV_QZODisQ&ab_channel=LilPeep
     // https://www.youtube.com/watch?v=LOBv-1-6cNw&fbclid=IwAR2zPvBp8suY16QKDmsIkvHWk1pUmarxOTqI0S_FDA-z-MdITOXxcxlF6Ps
-    // https://www.youtube.com/watch?v=dDpkiptRHAw&t=0s&list=PL2vg1YHilh9DxS9KFyTV_A5Hf0c6cEGfk&index=5
-    //TODO: fails if this one's arguments are out of order
-    var regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??(?:time_continue=\d+?&)?v?=?([^#\&\?\/]*).*/;
+    // https://www.youtube.com/watch?t=0s&v=dDpkiptRHAw&list=PL2vg1YHilh9DxS9KFyTV_A5Hf0c6cEGfk&index=5
+    var regExp = /^.*youtu(?:be\.com|\.be)\/(?:.*(?:&|\?)v=([^&]*)|([^?]*)).*$/;
     var match = url.match(regExp);
-    if (!match || match[7].length !== 11) {
+    if (!match || (url.match(regExp)[1] || url.match(regExp)[2]).length !== 11) {
         console.log('Failed to extract Youtube ID from ' + url);
         return false;
     }
-    return match[7];
+    return url.match(regExp)[1] || url.match(regExp)[2];
 }
 
 function getScoreDataAttr(post) {
@@ -91,7 +90,7 @@ async function findFirstYYYYMMDD() {
     let yyyymmdd = null;
     let currentDate = new Date();
     while (!yyyymmdd) {
-        let currentJSON = 'daily/' + currentDate.toYYYYMMDD() + '.json';
+        let currentJSON = 'https://raw.githubusercontent.com/btouellette/HHHFreshBotRedux/master/docs/daily/' + currentDate.toYYYYMMDD() + '.json';
         await fetch(currentJSON).then(res => { if(res.ok) { yyyymmdd = currentDate.toYYYYMMDD(); }});
         currentDate = currentDate.addDays(-1);
     }
@@ -128,7 +127,7 @@ function populatePage(yyyymmdd, prepend) {
     isPopulating = true;
     // Spinner disabled for now as this loads very fast
     // $container.append($('<div class="spinner-container"><div class="spinner"><div class="bounce1"></div><div class="bounce2"></div><div class="bounce3"></div></div></div>'));
-    fetch('daily/' + yyyymmdd + '.json').then(res => {
+    fetch('https://raw.githubusercontent.com/btouellette/HHHFreshBotRedux/master/docs/daily/' + yyyymmdd + '.json').then(res => {
         if (res.ok) {
             res.json().then(json => {
                 lastYYYYMMDD = yyyymmdd;
@@ -206,7 +205,7 @@ function populatePage(yyyymmdd, prepend) {
                 }
             });
         } else {
-            console.log('Request for daily/' + yyyymmdd + '.json failed');
+            console.log('Request for ' + yyyymmdd + '.json failed');
             const $dayContainer = $(`<div class="day-container"><h2 id="${yyyymmdd}">End of archived posts</h2></div>`);
             if (prepend) {
                 $container.prepend($dayContainer);

@@ -651,4 +651,12 @@ process.on('uncaughtException', (error) => {
 
 //==============================================================================
 
+// GitHub.requestPageBuild();
 FreshBot.start();
+
+//https://developer.github.com/v3/repos/pages/#request-a-page-build
+//https://platform.github.community/t/resource-not-accessible-by-integration-when-setting-status-as-organisation/1711/3
+//https://stackoverflow.com/questions/45496765/github-api-v3-required-permissions-for-managing-deploy-keys
+// https://github.com/contact?form%5Bsubject%5D=Projects+REST+API
+// https://platform.github.community/t/resource-not-accessible-by-integration-when-requesting-page-build/7649
+// https://github.community/t5/GitHub-API-Development-and/Resource-not-accessible-by-integration-when-requesting-GitHub/m-p/13829/thread-id/169
