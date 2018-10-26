@@ -49,7 +49,10 @@ function getYoutubeID(url){
     // https://www.youtube.com/watch?v=fzV_QZODisQ&ab_channel=LilPeep
     // https://www.youtube.com/watch?v=LOBv-1-6cNw&fbclid=IwAR2zPvBp8suY16QKDmsIkvHWk1pUmarxOTqI0S_FDA-z-MdITOXxcxlF6Ps
     // https://www.youtube.com/watch?t=0s&v=dDpkiptRHAw&list=PL2vg1YHilh9DxS9KFyTV_A5Hf0c6cEGfk&index=5
-    var regExp = /^.*youtu(?:be\.com|\.be)\/(?:.*(?:&|\?)v=([^&]*)|([^?]*)).*$/;
+    // https://m.youtube.com/watch?v=11k_oYjTP2k#menu
+    // https://www.youtube.com/attribution_link?a=XwwV8HCz3YU&u=%2Fwatch%3Fv%3D2Y6COHwwTQc%26feature%3Dshare
+    
+    var regExp = /^.*youtu(?:be\.com|\.be)\/(?:.*(?:&|\?)[va]=([^&#]*)|([^?]*)).*$/;
     var match = url.match(regExp);
     if (!match || (url.match(regExp)[1] || url.match(regExp)[2]).length !== 11) {
         console.log('Failed to extract Youtube ID from ' + url);
