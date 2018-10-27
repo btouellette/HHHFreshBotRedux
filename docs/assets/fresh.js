@@ -1,6 +1,7 @@
 //TODO: check if media is available and don't add card if not
-//TODO: unload previous days after some number of posts?
+//TODO: unload previous days after some number of posts? (windowing)
 //TODO: remember last visit and provide link to that day?
+//TODO: get embeds to Youtube playlists working
 
 /*global fetch*/
 /*global history*/
@@ -54,30 +55,38 @@ function getYoutubeID(url){
     
     var regExp = /^.*youtu(?:be\.com|\.be)\/(?:.*(?:&|\?)[va]=([^&#]*)|([^?]*)).*$/;
     var match = url.match(regExp);
-    if (!match || (url.match(regExp)[1] || url.match(regExp)[2]).length !== 11) {
+    if (!match || (match[1] || match[2]).length !== 11) {
         console.log('Failed to extract Youtube ID from ' + url);
         return false;
     }
-    return url.match(regExp)[1] || url.match(regExp)[2];
+    return match[1] || match[2];
 }
 
 function getScoreDataAttr(post) {
     return `data-score="${post.score}"${post.score < minScore ? ' style="display: none;"' : ''}`;
 }
 
-function replaceYoutubeWithIFrame() {
-    var iframe = document.createElement("iframe");
-    var embed = "https://www.youtube.com/embed/ID?autoplay=1";
-    iframe.setAttribute("src", embed.replace("ID", this.dataset.id));
-    iframe.setAttribute("frameborder", "0");
-    iframe.setAttribute("allowfullscreen", "1");
-    this.parentNode.style.backgroundColor = 'transparent';
-    this.parentNode.replaceChild(iframe, this);
+function replaceYoutubeWithIFrame(e, wrapper, url) {
+    if (e.which == 2) {
+        window.open(url);
+    } else if (e.which == 1) {
+        var iframe = document.createElement("iframe");
+        var embed = "https://www.youtube.com/embed/ID?autoplay=1";
+        iframe.setAttribute("src", embed.replace("ID", wrapper.dataset.id));
+        iframe.setAttribute("frameborder", "0");
+        iframe.setAttribute("allowfullscreen", "1");
+        wrapper.parentNode.style.backgroundColor = 'transparent';
+        wrapper.parentNode.replaceChild(iframe, wrapper);
+    }
 }
 
-function replaceSoundcloudWithIframe(newHTML, wrapper) {
-    wrapper.parentNode.style.backgroundColor = 'transparent';
-    $(wrapper).replaceWith($(newHTML));
+function replaceSoundcloudWithIframe(e, newHTML, wrapper, url) {
+    if (e.which == 2) {
+        window.open(url);
+    } else if (e.which == 1) {
+        wrapper.parentNode.style.backgroundColor = 'transparent';
+        $(wrapper).replaceWith($(newHTML));
+    }
 }
 
 function removeFreshTag(title) {
@@ -128,8 +137,7 @@ $("#min-score-input").on("keyup keydown change", debounced(1000, function() {
 let isPopulating = false;
 function populatePage(yyyymmdd, prepend) {
     isPopulating = true;
-    // Spinner disabled for now as this loads very fast
-    // $container.append($('<div class="spinner-container"><div class="spinner"><div class="bounce1"></div><div class="bounce2"></div><div class="bounce3"></div></div></div>'));
+    $container.append($('<div class="spinner-container"><div class="spinner"><div class="bounce1"></div><div class="bounce2"></div><div class="bounce3"></div></div></div>'));
     fetch('https://raw.githubusercontent.com/btouellette/HHHFreshBotRedux/master/docs/daily/' + yyyymmdd + '.json').then(res => {
         if (res.ok) {
             res.json().then(json => {
@@ -155,7 +163,7 @@ function populatePage(yyyymmdd, prepend) {
                         const ytID = getYoutubeID(post.url);
                         const $newElement = $(wrapStart + `<div class="player youtube-player" data-id="${ytID}"><div data-id="${ytID}"><span>${removeFreshTag(post.title)}</span><img src="https://i.ytimg.com/vi/${ytID}/hqdefault.jpg"><div class="play"></div></div></div>` + wrapEnd);
                         $dayContainer.append($newElement);
-                        $newElement.find('.youtube-player > div').on('click', replaceYoutubeWithIFrame);
+                        $newElement.find('.youtube-player > div').on('mousedown', function(e) { replaceYoutubeWithIFrame(e, this, post.url); });
                         
                     } else if (post.url.includes('soundcloud.com')) {
                         
@@ -178,13 +186,13 @@ function populatePage(yyyymmdd, prepend) {
                                         artwork_url = artwork_url || oembedData.thumbnail_url;
                                         const $newElement = $(wrapStart + `<div class="player soundcloud-player"><div><span>${removeFreshTag(post.title)}</span><img src="${artwork_url}"><div class="play"></div></div></div>` + wrapEnd);
                                         $dayContainer.append($newElement);
-                                        $newElement.find('.soundcloud-player > div').on('click', function() { replaceSoundcloudWithIframe(oembedData.html, this); });
+                                        $newElement.find('.soundcloud-player > div').on('mousedown', function(e) { replaceSoundcloudWithIframe(e, oembedData.html, this, post.url); });
                                     });
                                 });
                             } else {
                                 const $newElement = $(wrapStart + `<div class="player soundcloud-player"><div><span>${removeFreshTag(post.title)}</span><img src="${oembedData.thumbnail_url}"><div class="play"></div></div></div>` + wrapEnd);
                                 $dayContainer.append($newElement);
-                                $newElement.find('.soundcloud-player > div').on('click', function() { replaceSoundcloudWithIframe(oembedData.html, this); });
+                                $newElement.find('.soundcloud-player > div').on('mousedown', function(e) { replaceSoundcloudWithIframe(e, oembedData.html, this, post.url); });
                             }
                          });
                          
@@ -193,13 +201,13 @@ function populatePage(yyyymmdd, prepend) {
                         // Spotify API access to get album artwork requires user authorization
                         // Bandcamp, Datpiff, iTunes no public APIs but could scrape with server side code (if there was any)
                         
-                        // Reddit embeds for everything else (these are much more expensive)
+                        // Reddit embeds for everything else (these are much more expensive since they typically embed reddit and then a third party site as well)
                         const $newElement = $(`<div class="grid-item" ${getScoreDataAttr(post)}><blockquote class="reddit-card" data-card-created="${Math.floor(Date.now() / 1000)}"><a href="https://www.reddit.com${post.permalink}?ref=share&ref_source=embed"></a></blockquote></div>`);
                         $dayContainer.append($newElement);
                         
                     }
                 });
-                // $('.spinner').remove();
+                $('.spinner').remove();
                 isPopulating = false;
                 // If there is no scroll bar go ahead and explicitly trigger a scroll to load the next day
                 if (!prepend && $(document).height() <= $(window).height()) {
@@ -215,7 +223,7 @@ function populatePage(yyyymmdd, prepend) {
             } else {
                 $container.append($dayContainer);
             }
-            // $('.spinner').remove();
+            $('.spinner').remove();
         }
     });
 }

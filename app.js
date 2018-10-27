@@ -36,6 +36,7 @@ const jsonwebtoken = require('jsonwebtoken');
 //
 // console.log('Node version is: ' + process.version);
 
+// Read all configuration from environment variables into single object
 const config = {
   reddit: {
     USER_AGENT:           process.env.REDDIT_USER_AGENT,
@@ -50,14 +51,15 @@ const config = {
     DEBUG_MODE:           process.env.REDDIT_DEBUG_MODE // true or false/missing
   },
   github: {
-    PEM:             process.env.GITHUB_PEM,
-    APP_ID:          process.env.GITHUB_APP_ID,
-    INSTALLATION_ID: process.env.GITHUB_INSTALLATION_ID,
-    NAME:            process.env.GITHUB_NAME,
-    EMAIL:           process.env.GITHUB_EMAIL,
-    REPO:            process.env.GITHUB_REPO,
-    REPO_OWNER:      process.env.GITHUB_REPO_OWNER,
-    PAGES_LINK:      process.env.GITHUB_PAGES_LINK
+    PEM:                 process.env.GITHUB_PEM,
+    APP_ID:              process.env.GITHUB_APP_ID,
+    INSTALLATION_ID:     process.env.GITHUB_INSTALLATION_ID,
+    NAME:                process.env.GITHUB_NAME,
+    EMAIL:               process.env.GITHUB_EMAIL,
+    REPO:                process.env.GITHUB_REPO,
+    REPO_OWNER:          process.env.GITHUB_REPO_OWNER,
+    REPO_OWNER_PASSWORD: process.env.GITHUB_REPO_OWNER_PASSWORD,
+    PAGES_LINK:          process.env.GITHUB_PAGES_LINK
   },
   DB_URL:    process.env.DATABASE_URL,
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
@@ -65,6 +67,7 @@ const config = {
   DEV_ENV:   process.env.DEV_ENV
 };
 
+// Set up winston logging
 const logger = winston.createLogger({
   level: config.LOG_LEVEL || 'debug',
   format: winston.format.combine(
@@ -76,6 +79,8 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()]
 });
 
+
+// Configure snoowrap with Reddit app details
 const reddit = new snoowrap({
   userAgent:    config.reddit.USER_AGENT,
   clientId:     config.reddit.CLIENT_ID,
@@ -90,6 +95,7 @@ reddit.config({
   debug: config.reddit.DEBUG_MODE
 });
 
+// Template of messages in use for reddit PMs and posts
 const Template = {
   introDaily: 'Welcome to The Daily Freshness! Fresh /r/hiphopheads posts delivered right to your inbox each day.\n\n',
   introWeekly: 'Welcome to The Weekly Freshness! Fresh /r/hiphopheads posts delivered right to your inbox each week.\n\n',
@@ -111,8 +117,10 @@ Template.unsubscribeSuccess = 'You have been unsubscribed from all mailing lists
 
 //==============================================================================
 
+// Functions for adding daily updates to GitHub repo and updating GitHub Pages site
 const GitHub = {
   addPostsToRepo: async function(posts, dayStart) {
+    // Generate commit of days posts as JSON to GitHub repo via GitHub App
     const dayString = dayStart.toYYYYMMDD();
     const filepath = 'docs/daily/' + dayString + '.json';
     const contents = JSON.stringify(posts, null, 2);
@@ -124,6 +132,7 @@ const GitHub = {
   },
   
   pushFileToRepo: async function(filepath, contents, message) {
+    // Writing commit to repo via installation token used by GitHub App installed with permissions on repo
     logger.debug('Authenticating to GitHub');
     
     const octokit = octokitrest();
@@ -150,17 +159,16 @@ const GitHub = {
   },
   
   requestPageBuild: async function() {
+    // Pages endpoints not available to GitHub App via installation token
+    // Authenticate with explicit details to primary account to request new build so that new file is available 
     logger.debug('Authenticating to GitHub');
     
     const octokit = octokitrest();
     octokit.authenticate({
-      type: 'app',
-      token: await GitHub.generateJsonWebToken()
+      type: 'basic',
+      username: config.github.REPO_OWNER,
+      password: config.github.REPO_OWNER_PASSWORD
     });
-    const { data: { token } } = await octokit.apps.createInstallationToken({
-      installation_id: config.github.INSTALLATION_ID
-    });
-    octokit.authenticate({ type: 'token', token });
     
     logger.debug('Successfully authenticated to GitHub');
     
@@ -183,28 +191,34 @@ const GitHub = {
 
 //==============================================================================
 
+// Wrapper for all Postgres DB interaction
 const DB = {
   client: new pg.Client({ connectionString: config.DB_URL }),
   
   getMaxTimestamp: async function() {
+    // Get the UTC time of the most recent loaded post
     // If no posts added yet start with last Sunday
     const query = "SELECT COALESCE(MAX(created_utc), EXTRACT(epoch from current_date - cast(extract(dow from current_date) as int))) as max_time FROM posts";
     return DB.client.query(query).then(res => res.rows[0].max_time);
   },
   
   getMinDate: async function() {
+    // Get the oldest day for which there are posts in the DB
     return DB.client.query("SELECT MIN(day) as min_date FROM posts").then(res => res.rows[0].min_date);
   },
   
   getMinUnsentDate: async function() {
+    // Get the oldest day for which there are posts in the DB and no daily message has been sent out via Reddit PMs
     return DB.client.query("SELECT MIN(day) as min_date FROM posts WHERE daily_sent = false").then(res => res.rows[0].min_date);
   },
   
   getWeeklySubscribers: async function() {
+    // Gets all Reddit users who have subscribed to weekly PMs
     return DB.client.query("SELECT DISTINCT username FROM subscriptions WHERE type = 'weekly'").then(res => res.rows.map(row => row.username));
   },
   
   getDailySubscribers: async function() {
+    // Gets all Reddit users who have subscribed to daily PMs
     return DB.client.query("SELECT DISTINCT username FROM subscriptions WHERE type = 'daily'").then(res => res.rows.map(row => row.username));
   },
   
@@ -599,7 +613,7 @@ const FreshBot = {
     // Process incoming messages and record any new subscriptions/unsubscriptions. Let all users register before moving on to creating posts/messages
     // Populate new posts into database
     await Promise.all([
-      //FreshBot.processPrivateMessages(),
+      FreshBot.processPrivateMessages(),
       FreshBot.fetchNewPosts()
     ]);
     
@@ -610,9 +624,10 @@ const FreshBot = {
     await FreshBot.doDailyTasks(endDate);
     await FreshBot.doWeeklyTasks(endDate);
     
-    await DB.close();
-    
-    await GitHub.requestPageBuild();
+    await Promise.all([
+      DB.close(),
+      GitHub.requestPageBuild()
+    ]);
     
     process.exit(0);
   }
@@ -651,12 +666,4 @@ process.on('uncaughtException', (error) => {
 
 //==============================================================================
 
-// GitHub.requestPageBuild();
 FreshBot.start();
-
-//https://developer.github.com/v3/repos/pages/#request-a-page-build
-//https://platform.github.community/t/resource-not-accessible-by-integration-when-setting-status-as-organisation/1711/3
-//https://stackoverflow.com/questions/45496765/github-api-v3-required-permissions-for-managing-deploy-keys
-// https://github.com/contact?form%5Bsubject%5D=Projects+REST+API
-// https://platform.github.community/t/resource-not-accessible-by-integration-when-requesting-page-build/7649
-// https://github.community/t5/GitHub-API-Development-and/Resource-not-accessible-by-integration-when-requesting-GitHub/m-p/13829/thread-id/169
