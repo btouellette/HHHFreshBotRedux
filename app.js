@@ -48,7 +48,7 @@ const config = {
     PM_MAX_LENGTH:        process.env.REDDIT_PM_MAX_LENGTH || 9500, // Current reddit limits are 10k char for PM and comment and 40k char for self post but defaults will undershoot those slightly
     SELF_POST_MAX_LENGTH: process.env.REDDIT_SELF_POST_MAX_LENGTH || 39500,
     COMMENT_MAX_LENGTH:   process.env.REDDIT_COMMENT_MAX_LENGTH || 9500,
-    DEBUG_MODE:           process.env.REDDIT_DEBUG_MODE // true or false/missing
+    DEBUG_MODE:           process.env.REDDIT_DEBUG_MODE, // true or false/missing
   },
   github: {
     PEM:                 process.env.GITHUB_PEM,
@@ -59,12 +59,12 @@ const config = {
     REPO:                process.env.GITHUB_REPO,
     REPO_OWNER:          process.env.GITHUB_REPO_OWNER,
     REPO_OWNER_PASSWORD: process.env.GITHUB_REPO_OWNER_PASSWORD,
-    PAGES_LINK:          process.env.GITHUB_PAGES_LINK
+    PAGES_LINK:          process.env.GITHUB_PAGES_LINK,
   },
   DB_URL:    process.env.DATABASE_URL,
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
   MIN_SCORE: process.env.MIN_SCORE || 25,
-  DEV_ENV:   process.env.DEV_ENV
+  DEV_ENV:   process.env.DEV_ENV,
 };
 
 // Set up winston logging
@@ -76,7 +76,7 @@ const logger = winston.createLogger({
       return `${info.timestamp} - ${info.level} - ${info.message}`;
     })
   ),
-  transports: [new winston.transports.Console()]
+  transports: [new winston.transports.Console()],
 });
 
 
@@ -86,13 +86,13 @@ const reddit = new snoowrap({
   clientId:     config.reddit.CLIENT_ID,
   clientSecret: config.reddit.CLIENT_SECRET,
   username:     config.reddit.USERNAME,
-  password:     config.reddit.PASSWORD
+  password:     config.reddit.PASSWORD,
 });
 reddit.config({
   requestDelay: 0,
   continueAfterRatelimitError: true,
   maxRetryAttempts: 5,
-  debug: config.reddit.DEBUG_MODE
+  debug: config.reddit.DEBUG_MODE,
 });
 
 // Template of messages in use for reddit PMs and posts
@@ -125,28 +125,28 @@ const GitHub = {
     const filepath = 'docs/daily/' + dayString + '.json';
     const contents = JSON.stringify(posts, null, 2);
     const message = 'Automated push of [FRESH] posts for ' + dayString;
-    
+
     logger.info('Pushing posts for ' + dayString + ' to GitHub');
-    
+
     return GitHub.pushFileToRepo(filepath, contents, message);
   },
-  
+
   pushFileToRepo: async function(filepath, contents, message) {
     // Writing commit to repo via installation token used by GitHub App installed with permissions on repo
     logger.debug('Authenticating to GitHub');
-    
+
     const octokit = octokitrest();
     octokit.authenticate({
       type: 'app',
-      token: await GitHub.generateJsonWebToken()
+      token: await GitHub.generateJsonWebToken(),
     });
     const { data: { token } } = await octokit.apps.createInstallationToken({
-      installation_id: config.github.INSTALLATION_ID
+      installation_id: config.github.INSTALLATION_ID,
     });
     octokit.authenticate({ type: 'token', token });
-    
+
     logger.debug('Successfully authenticated to GitHub');
-    
+
     return octokit.repos.createFile({
       owner: config.github.REPO_OWNER,
       repo: config.github.REPO,
@@ -154,39 +154,39 @@ const GitHub = {
       path: filepath,
       content: Buffer.from(contents).toString('base64'),
       name: config.github.NAME,
-      email: config.github.EMAIL
+      email: config.github.EMAIL,
     });
   },
-  
+
   requestPageBuild: async function() {
     // Pages endpoints not available to GitHub App via installation token
-    // Authenticate with explicit details to primary account to request new build so that new file is available 
+    // Authenticate with explicit details to primary account to request new build so that new file is available
     logger.debug('Authenticating to GitHub');
-    
+
     const octokit = octokitrest();
     octokit.authenticate({
       type: 'basic',
       username: config.github.REPO_OWNER,
-      password: config.github.REPO_OWNER_PASSWORD
+      password: config.github.REPO_OWNER_PASSWORD,
     });
-    
+
     logger.debug('Successfully authenticated to GitHub');
-    
+
     return octokit.repos.requestPageBuild({
       owner: config.github.REPO_OWNER,
-      repo: config.github.REPO
+      repo: config.github.REPO,
     });
   },
-  
+
   generateJsonWebToken: async function() {
     // Sign with RSA SHA256
     const payload = {
       iat: Math.floor(new Date() / 1000),
       exp: Math.floor(new Date() / 1000) + 500,
-      iss: config.github.APP_ID
+      iss: config.github.APP_ID,
     };
     return jsonwebtoken.sign(payload, config.github.PEM, { algorithm: 'RS256' });
-  }
+  },
 };
 
 //==============================================================================
@@ -194,132 +194,146 @@ const GitHub = {
 // Wrapper for all Postgres DB interaction
 const DB = {
   client: new pg.Client({ connectionString: config.DB_URL }),
-  
+
   getMaxTimestamp: async function() {
     // Get the UTC time of the most recent loaded post
     // If no posts added yet start with last Sunday
-    const query = "SELECT COALESCE(MAX(created_utc), EXTRACT(epoch from current_date - cast(extract(dow from current_date) as int))) as max_time FROM posts";
+    const query = 'SELECT COALESCE(MAX(created_utc), EXTRACT(epoch from current_date - cast(extract(dow from current_date) as int))) as max_time FROM posts';
     return DB.client.query(query).then(res => res.rows[0].max_time);
   },
-  
+
   getMinDate: async function() {
     // Get the oldest day for which there are posts in the DB
-    return DB.client.query("SELECT MIN(day) as min_date FROM posts").then(res => res.rows[0].min_date);
+    return DB.client.query('SELECT MIN(day) as min_date FROM posts').then(res => res.rows[0].min_date);
   },
-  
+
   getMinUnsentDate: async function() {
     // Get the oldest day for which there are posts in the DB and no daily message has been sent out via Reddit PMs
-    return DB.client.query("SELECT MIN(day) as min_date FROM posts WHERE daily_sent = false").then(res => res.rows[0].min_date);
+    return DB.client.query('SELECT MIN(day) as min_date FROM posts WHERE daily_sent = false').then(res => res.rows[0].min_date);
   },
-  
+
   getWeeklySubscribers: async function() {
     // Gets all Reddit users who have subscribed to weekly PMs
     return DB.client.query("SELECT DISTINCT username FROM subscriptions WHERE type = 'weekly'").then(res => res.rows.map(row => row.username));
   },
-  
+
   getDailySubscribers: async function() {
     // Gets all Reddit users who have subscribed to daily PMs
     return DB.client.query("SELECT DISTINCT username FROM subscriptions WHERE type = 'daily'").then(res => res.rows.map(row => row.username));
   },
-  
+
   setScore: async function(id, score) {
+    // Updates stored score for a specific post
     const query = pgformat('UPDATE posts SET score = %L WHERE id = %L', score, id);
     logger.debug(query);
     return DB.client.query(query);
   },
-  
+
   getAllPosts: async function() {
+    // Returns all posts in DB
     return DB.client.query('SELECT * FROM posts').then(res => res.rows);
   },
-  
+
   getPostsForDay: async function(date) {
+    // Returns all posts for a specific day, takes a Date parameter
     const query = pgformat('SELECT * FROM posts WHERE day = %L ORDER BY score DESC', date.toYYYYMMDD());
     logger.debug(query);
     return DB.client.query(query).then(res => res.rows);
   },
-  
+
   getPostsForWeek: async function(startDate, endDate) {
+    // Returns all posts between two days, takes two Date parameters
     const query = pgformat('SELECT * FROM posts WHERE day >= %L AND day < %L ORDER BY day ASC, score DESC', startDate.toYYYYMMDD(), endDate.toYYYYMMDD());
     logger.debug(query);
     return DB.client.query(query).then(res => res.rows);
   },
-  
+
   insertPosts: async function(posts) {
+    // Add posts to DB, only keep columns in the posts table
     const postsAsArray = posts.map(post => ([post.day, post.id, post.title, post.permalink, post.url, post.author.name, post.created_utc, post.score]));
     const query = pgformat('INSERT INTO posts(day, id, title, permalink, url, author, created_utc, score) VALUES %L ON CONFLICT(id) DO UPDATE SET score = EXCLUDED.score', postsAsArray);
     logger.debug(query);
     return DB.client.query(query);
   },
-  
+
   subscribeUserToDaily: async function(user) {
+    // Add a daily subscription for a user
+    //TODO: add PK on this table or merge
     const query = pgformat("INSERT INTO subscriptions(username, type) VALUES (%L, 'daily')", user);
     logger.debug(query);
     return DB.client.query(query);
   },
-  
+
   subscribeUserToWeekly: async function(user) {
+    // Add a weekly subscription for a user
     const query = pgformat("INSERT INTO subscriptions(username, type) VALUES (%L, 'weekly')", user);
     logger.debug(query);
     return DB.client.query(query);
   },
-  
+
   unsubscribeUser: async function(user) {
-    const query = pgformat("DELETE FROM subscriptions WHERE username = %L", user);
+    // Removes all subscriptions for a user
+    const query = pgformat('DELETE FROM subscriptions WHERE username = %L', user);
     logger.debug(query);
     return DB.client.query(query);
   },
-  
+
   markDaySent: async function(date) {
+    // Marks all posts for a specific day as having their associated Reddit PM sent, takes a Date parameter
     const query = pgformat('UPDATE posts SET daily_sent = true WHERE day = %L', date.toYYYYMMDD());
     logger.debug(query);
     return DB.client.query(query);
   },
-  
+
   purgeDays: async function(startDate, endDate) {
+    // Removes all posts in a date range, takes two Date parameters
     const query = pgformat('DELETE FROM posts WHERE day >= %L AND day < %L', startDate.toYYYYMMDD(), endDate.toYYYYMMDD());
     logger.debug(query);
     return DB.client.query(query);
   },
-  
+
   init: async function() {
     logger.info('Initializing DB');
-    // Connect and create tables
+    // Connect and create tables and indexes
     await DB.client.connect();
     return Promise.all([
       DB.client.query('CREATE TABLE IF NOT EXISTS subscriptions(username TEXT, type TEXT)')
         .then(() => DB.client.query('CREATE INDEX IF NOT EXISTS subscriptions_type_idx ON subscriptions (type)')),
       DB.client.query('CREATE TABLE IF NOT EXISTS posts(day DATE, id TEXT PRIMARY KEY, title TEXT, permalink TEXT, url TEXT, author TEXT, created_utc INT, score INT, daily_sent BOOLEAN DEFAULT FALSE)')
         .then(() => DB.client.query('CREATE INDEX IF NOT EXISTS posts_day_idx ON posts (day)'))
-        .then(() => DB.client.query('CREATE INDEX IF NOT EXISTS posts_created_utc_idx ON posts (created_utc)'))
+        .then(() => DB.client.query('CREATE INDEX IF NOT EXISTS posts_created_utc_idx ON posts (created_utc)')),
     ]);
   },
-  
+
   close: async function() {
     return DB.client.end();
-  }
+  },
 };
 
 //==============================================================================
 
+// Wrapper for all interactions with Reddit and primary bot actions
 const FreshBot = {
+  // Whether posts in the DB have had their scores updated yet this run
   scoresUpdated: false,
-  
+
   getNewPostsFromReddit: async function(maxTimeInDB) {
-    
+    // Fetch all FRESH posts from r/hiphopheads since a provided UTC time
+    // Realistically the Reddit search API only returns 3-4 days of results or ~250 results (see https://github.com/not-an-aardvark/snoowrap/issues/162)
     const secondsBehind = new Date() / 1000 - maxTimeInDB;
-    const timeFilter = secondsBehind >= 604800 ? 'month' : 
-                       secondsBehind >= 86400  ? 'week' : 
-                       secondsBehind >= 3600   ? 'day' : 
-                                                 'hour';    
+    const timeFilter = secondsBehind >= 604800 ? 'month' :
+                       secondsBehind >= 86400  ? 'week' :
+                       secondsBehind >= 3600   ? 'day' :
+                                                 'hour';
     logger.info('Fetching new posts from last ' + timeFilter);
-    // This will return only ~250 posts (see https://github.com/not-an-aardvark/snoowrap/issues/162)
+
     return reddit.search({ query: 'title:"FRESH"',
                            subreddit: 'hiphopheads',
                            sort: 'new',
                            time: timeFilter })
                  .fetchAll()
                  .filter(post => post.created_utc >= maxTimeInDB && post.title.match(/[\[\(\{]\s*FRESH/i)) // filter out any posts already inserted into the DB or that don't actually have a FRESH tag (reddit search is not exact)
-                 .map(post => ({  
+                 .map(post => ({
                    day: new Date(post.created_utc * 1000).toYYYYMMDD(),
                    id: post.id,
                    title: post.title,
@@ -327,16 +341,17 @@ const FreshBot = {
                    url: post.url,
                    author: post.author,
                    created_utc: post.created_utc,
-                   score: post.score
+                   score: post.score,
                  }));
   },
-  
+
   fetchNewPosts: async function() {
+    // Gets posts since last load from Reddit and adds them all to the DB
     // See how far we've loaded so far
     const maxTimeInDB = await DB.getMaxTimestamp();
     const startDate = new Date(maxTimeInDB * 1000);
     logger.info('Previously fetched up to ' + startDate);
-    
+
     // Get any new posts since then and add to posts table in DB
     const posts = await FreshBot.getNewPostsFromReddit(maxTimeInDB);
     logger.info('Adding ' + posts.length + ' new posts to DB');
@@ -344,15 +359,16 @@ const FreshBot = {
       return DB.insertPosts(posts);
     }
   },
-  
+
   processPrivateMessagesForUser: async function(PMs) {
     if (config.DEV_ENV) {
       return;
     }
-    
+
     // Process PMs in order received
     const sortedPMs = PMs.sort((a, b) => { return a.created_utc - b.created_utc; });
 
+    // Act on subscription and unsubscription messages by updating DB then reply via private message
     for (let i = 0, len = sortedPMs.length; i < len; i++) {
       const currentPM = sortedPMs[i];
       if (currentPM.subject === 'subscribe' && currentPM.body === 'daily') {
@@ -370,35 +386,37 @@ const FreshBot = {
       }
     }
   },
-  
+
   processPrivateMessages: async function() {
+    // Check all new private messages on Reddit
     const newMessages = await reddit.getUnreadMessages().fetchAll();
     const newPMs = newMessages.filter(msg => !msg.was_comment);
-    
+
     logger.info('Processing ' + newPMs.length + ' new PMs');
-    
-    // Group PMs to handle PMs from different users in parallel
-    const groupedPMs = newPMs.reduce((r, pm) => { 
+
+    // Group PMs by user to handle PMs from different users in parallel
+    const groupedPMs = newPMs.reduce((r, pm) => {
       r[pm.author.name] = r[pm.author.name] || [];
       r[pm.author.name].push(pm);
       return r;
     }, Object.create(null));
-    
-    // Send to each user
+
+    // For each user process PMs
     const doneProcessingPMs = [];
-    for (var username in groupedPMs) {
+    for (const username in groupedPMs) {
       doneProcessingPMs.push(FreshBot.processPrivateMessagesForUser(groupedPMs[username]));
     }
-    
-    // Mark any messages as read
+
+    // Mark all messages as read
     if (newMessages.length > 0) {
       doneProcessingPMs.push(reddit.markMessagesAsRead(newMessages));
     }
-    
+
     return Promise.all(doneProcessingPMs);
   },
-  
+
   formatPostsToTable: async function(posts) {
+    // Creates a table in Reddit syntax for a set of posts
     let message = Template.tableHeader;
     posts.forEach(post => {
       message += '[' + post.title.replace('|', '&#124;') + '](' + post.url + ') | [link](' + post.permalink + ') | +' + post.score + ' | /u/' + post.author + '\n';
@@ -406,42 +424,45 @@ const FreshBot = {
     message += '\n';
     return message;
   },
-  
+
   sendDailyMessages: async function(posts, dayStart) {
+    // Create daily message from posts above threshold and send to all subscribers
     let message = Template.introDaily;
     message += '**[' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + dayStart.toYYYYMMDD() + ')**\n\n';
     message += await FreshBot.formatPostsToTable(posts);
     message += Template.footer;
-    
+
     const subject = 'The Daily [Fresh]ness - day of ' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-    
+
     logger.info('Sending daily message');
-    
+
     logger.debug('Subject: ' + subject);
     logger.debug('Contents:\n' + message);
-    
+
     const messagesSent = [];
     const subs = await DB.getDailySubscribers();
     subs.forEach(sub => { messagesSent.push(FreshBot.sendMessagesToSub(sub, subject, [message])); });
-    
+
     return Promise.all(messagesSent);
   },
-  
+
   sendWeeklyMessages: async function(posts, weekStart) {
+    // Create weekly message from posts above threshold and send to all subscribers
     // Group posts by day
     const groupedPosts = posts.reduce((r, post) => {
       r[post.day] = r[post.day] || [];
       r[post.day].push(post);
       return r;
     }, Object.create(null));
-    
+
     const messages = [];
     let message = '';
-    for (var day in groupedPosts) {
+    for (const day in groupedPosts) {
       const date = new Date(day);
       let dayTable = '**[' + date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + date.toYYYYMMDD() + ')**\n\n';
       dayTable += await FreshBot.formatPostsToTable(groupedPosts[day]);
-      
+
+      // If the message will exceed the max length of a PM split it into separate messages
       if (Template.introWeekly.length + message.length + dayTable.length + Template.footer.length > config.reddit.PM_MAX_LENGTH) {
         message = messages.length == 0 ? Template.introWeekly : '' + '**Part ' + (messages.length + 1) + '**\n\n' + message + Template.footer;
         messages.push(message);
@@ -452,47 +473,49 @@ const FreshBot = {
     }
     message = Template.introWeekly + (messages.length == 0 ? '' :  '**Part ' + (messages.length + 1) + '**\n\n') + message + Template.footer;
     messages.push(message);
-    
+
     const subject = 'The Weekly [Fresh]ness - week of ' + weekStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-    
+
     logger.info('Sending weekly message');
-    
+
     logger.debug('Subject: ' + subject);
     logger.debug('Contents:\n' + JSON.stringify(messages));
-    
+
     const messagesSent = [];
     const subs = await DB.getDailySubscribers();
-    subs.forEach(sub => { messagesSent.push(FreshBot.sendWeeklyMessagesToSub(sub, subject, message)); });
-    
+    subs.forEach(sub => { messagesSent.push(FreshBot.sendMessagesToSub(sub, subject, message)); });
+
     return Promise.all(messagesSent);
   },
-  
+
   sendMessagesToSub: async function(sub, subject, messages) {
     // Send messages to a specific subscriber in order
     for (let i = 0, len = messages.length; i < len; i++) {
       await reddit.composeMessage({
         to: sub,
         subject: subject,
-        text: messages[i]
+        text: messages[i],
       });
     }
   },
-  
+
   makeWeeklyPost: async function(posts, weekStart) {
+    // Create Reddit post to r/hiphopheads for all posts above threshold
     // Group posts by day
     const groupedPosts = posts.reduce((r, post) => {
       r[post.day] = r[post.day] || [];
       r[post.day].push(post);
       return r;
     }, Object.create(null));
-    
+
     const messages = [];
     let message = '';
-    for (var day in groupedPosts) {
+    for (const day in groupedPosts) {
       const date = new Date(day);
       let dayTable = '**[' + date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + date.toYYYYMMDD() + ')**\n\n';
       dayTable += await FreshBot.formatPostsToTable(groupedPosts[day]);
-      
+
+      // If the message will exceed the max length of a self post split it into separate messages which will be posted as comments
       if (message.length + dayTable.length + Template.footer.length > (messages.length === 0 ? config.reddit.SELF_POST_MAX_LENGTH : config.reddit.COMMENT_MAX_LENGTH)) {
         message = '**Part ' + (messages.length + 1) + '**\n\n' + message + Template.footer;
         messages.push(message);
@@ -503,36 +526,36 @@ const FreshBot = {
     }
     message = (messages.length == 0 ? '' :  '**Part ' + (messages.length + 1) + '**\n\n') + message + Template.footer;
     messages.push(message);
-    
+
     const title = 'The Weekly [Fresh]ness - week of ' + weekStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-    
+
     logger.info('Making weekly post');
-    
+
     logger.debug('Title: ' + title);
     logger.debug('Posts:\n' + JSON.stringify(messages));
-    
+
     // Submit post with weekly roundup
     const postsSent = [
       reddit.submitSelfpost({
         subredditName: 'testingground4bots', //'hiphopheads',
         title: title,
-        text: messages[0]
+        text: messages[0],
       })
     ];
-    
+
     // Add any remaining days as comments on the post
     for (let i = 1, len = messages.length; i < len; i++) {
       postsSent.push(postsSent[0].reply(messages[i]));
     }
-    
+
     return Promise.all(postsSent);
   },
-  
+
   doDailyTasks: async function(endDate) {
-    // Generate daily messages to subscribers and send posts to GitHub
+    // Generates daily messages to subscribers and send posts to GitHub
     const minUnsentDate = await DB.getMinUnsentDate();
     logger.info('Daily messages sent up to ' + minUnsentDate);
-    
+
     // Check if daily messages needs to be sent
     const sentDaysDone = [];
     for (let dayStart = new Date(minUnsentDate); dayStart.addDays(1).addHours(6) < endDate; dayStart = dayStart.addDays(1)) {
@@ -543,26 +566,26 @@ const FreshBot = {
       // We've loaded 6 hours into a new day, send daily messages and post
       const dayEnd = dayStart.addDays(1);
       logger.info('Processing day between ' + dayStart + ' and ' + dayEnd);
-      
-      // Get days posts, add to repo, and send messages to suscribers
+
+      // Get days posts from the DB, add them to repo, and send messages to suscribers
       const posts = await DB.getPostsForDay(dayStart);
       const postsAboveMinScore = posts.filter(post => post.score >= config.MIN_SCORE);
       if (!config.DEV_ENV) {
         sentDaysDone.push(GitHub.addPostsToRepo(posts, dayStart));
         sentDaysDone.push(FreshBot.sendDailyMessages(postsAboveMinScore, dayStart));
       }
-      
+
       // Update DB to mark this day sent
       sentDaysDone.push(DB.markDaySent(dayStart));
     }
     return Promise.all(sentDaysDone);
   },
-  
+
   doWeeklyTasks: async function(endDate) {
     // Generate weekly messages to subscribers and post to r/hiphopheads
     // Check if weekly messages and post needs to be sent
     const sentWeeksDone = [];
-    
+
     for (let weekStart = await DB.getMinDate(); weekStart.addDays(7).addHours(6) < endDate; weekStart = weekStart.addDays(7)) {
       if (!FreshBot.scoresUpdated) {
         await FreshBot.updateScores();
@@ -571,26 +594,26 @@ const FreshBot = {
       // We've loaded 6 hours into a new week, send weekly messages and post
       const weekEnd = weekStart.addDays(7);
       logger.info('Processing week between ' + weekStart + ' and ' + weekEnd);
-      
+
       // Get weeks posts, send messages, and post to r/hiphopheads
       const postsAboveMinScore = (await DB.getPostsForWeek(weekStart, weekEnd)).filter(post => post.score >= config.MIN_SCORE);
       if (!config.DEV_ENV) {
         sentWeeksDone.push(FreshBot.sendWeeklyMessages(postsAboveMinScore, weekStart));
         sentWeeksDone.push(FreshBot.makeWeeklyPost(postsAboveMinScore, weekStart));
       }
-      
+
       // Purge DB of previous week's data
       sentWeeksDone.push(DB.purgeDays(weekStart, weekEnd));
     }
     return Promise.all(sentWeeksDone);
   },
-  
-  updateScores: async function () {
+
+  updateScores: async function() {
     // Get all posts and for each check whether the score recorded matches the score currently on reddit
     const posts = await DB.getAllPosts();
-    
+
     logger.info('Updating scores on ' + posts.length + ' posts');
-    
+
     const updateDone = [];
     for (let i = 0, len = posts.length; i < len; i++) {
       const post = posts[i];
@@ -600,56 +623,56 @@ const FreshBot = {
         updateDone.push(DB.setScore(post.id, newScore));
       }
     }
-    
+
     return Promise.all(updateDone);
   },
-  
+
   start: async function() {
     logger.info('Starting');
-    
+
     // Start up DB connection
     await DB.init();
-    
+
     // Process incoming messages and record any new subscriptions/unsubscriptions. Let all users register before moving on to creating posts/messages
     // Populate new posts into database
     await Promise.all([
       FreshBot.processPrivateMessages(),
-      FreshBot.fetchNewPosts()
+      FreshBot.fetchNewPosts(),
     ]);
-    
+
     const endDate = await DB.getMaxTimestamp().then(ts => new Date(ts * 1000));
     logger.info('Loaded posts up to ' + endDate);
-    
+
     // Wait on days to be completed before moving to week processing as week processing will purge DB
     await FreshBot.doDailyTasks(endDate);
     await FreshBot.doWeeklyTasks(endDate);
-    
+
     await Promise.all([
       DB.close(),
-      GitHub.requestPageBuild()
+      GitHub.requestPageBuild(),
     ]);
-    
+
     process.exit(0);
-  }
+  },
 };
 
 //==============================================================================
 
-Date.prototype.addDays = function (days) {
+Date.prototype.addDays = function(days) {
   const newDate = new Date(this);
   newDate.setDate(newDate.getDate() + days);
   return newDate;
 };
-Date.prototype.addHours = function (hours) {
+Date.prototype.addHours = function(hours) {
   const newDate = new Date(this);
   newDate.setHours(newDate.getHours() + hours);
   return newDate;
 };
-Date.prototype.toYYYYMMDD = function () {
-  return this.toISOString().slice(0,10).replace(/-/g,"");
+Date.prototype.toYYYYMMDD = function() {
+  return this.toISOString().slice(0, 10).replace(/-/g, '');
 };
 
-String.prototype.fromYYYYMMDDtoDate = function () {
+String.prototype.fromYYYYMMDDtoDate = function() {
   return new Date(Date.UTC(this.substring(0, 4), this.substring(4, 6) - 1, this.substring(6, 8)));
 };
 
