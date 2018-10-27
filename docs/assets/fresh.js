@@ -1,7 +1,6 @@
 //TODO: check if media is available and don't add card if not
 //TODO: unload previous days after some number of posts? (windowing)
 //TODO: remember last visit and provide link to that day?
-//TODO: get embeds to Youtube playlists working
 
 /*global fetch*/
 /*global history*/
@@ -53,13 +52,22 @@ function getYoutubeID(url){
     // https://m.youtube.com/watch?v=11k_oYjTP2k#menu
     // https://www.youtube.com/attribution_link?a=XwwV8HCz3YU&u=%2Fwatch%3Fv%3D2Y6COHwwTQc%26feature%3Dshare
 
-    var regExp = /^.*youtu(?:be\.com|\.be)\/(?:.*(?:&|\?)[va]=([^&#]*)|([^?]*)).*$/;
+    var regExp = /^.*youtu(?:be\.com|\.be)\/(?:.*(?:&|\?)[va]=([^&#]*)|([^?#]*)).*$/;
     var match = url.match(regExp);
     if (!match || (match[1] || match[2]).length !== 11) {
         console.log('Failed to extract Youtube ID from ' + url);
         return false;
     }
     return match[1] || match[2];
+}
+
+function getYoutubePlaylist(url) {
+    var regExp = /^.*youtu(?:be\.com|\.be)\/.*(?:&|\?)list=([^&#]*).*$/;
+    var match = url.match(regExp);
+    if (!match) {
+        return false;
+    }
+    return match[1];
 }
 
 function getScoreDataAttr(post) {
@@ -70,9 +78,13 @@ function replaceYoutubeWithIFrame(e, wrapper, url) {
     if (e.which == 2) {
         window.open(url);
     } else if (e.which == 1) {
-        var iframe = document.createElement("iframe");
-        var embed = "https://www.youtube.com/embed/ID?autoplay=1";
-        iframe.setAttribute("src", embed.replace("ID", wrapper.dataset.id));
+        const iframe = document.createElement("iframe");
+        let embed = `https://www.youtube.com/embed/${wrapper.dataset.id}?autoplay=1`;
+        const playlist = getYoutubePlaylist(url);
+        if (playlist) {
+            embed += '&list=' + playlist;
+        }
+        iframe.setAttribute("src", embed);
         iframe.setAttribute("frameborder", "0");
         iframe.setAttribute("allowfullscreen", "1");
         wrapper.parentNode.style.backgroundColor = 'transparent';
