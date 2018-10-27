@@ -52,7 +52,7 @@ function getYoutubeID(url){
     // https://www.youtube.com/watch?t=0s&v=dDpkiptRHAw&list=PL2vg1YHilh9DxS9KFyTV_A5Hf0c6cEGfk&index=5
     // https://m.youtube.com/watch?v=11k_oYjTP2k#menu
     // https://www.youtube.com/attribution_link?a=XwwV8HCz3YU&u=%2Fwatch%3Fv%3D2Y6COHwwTQc%26feature%3Dshare
-    
+
     var regExp = /^.*youtu(?:be\.com|\.be)\/(?:.*(?:&|\?)[va]=([^&#]*)|([^?]*)).*$/;
     var match = url.match(regExp);
     if (!match || (match[1] || match[2]).length !== 11) {
@@ -102,7 +102,7 @@ async function findFirstYYYYMMDD() {
     let yyyymmdd = null;
     let currentDate = new Date();
     while (!yyyymmdd) {
-        let currentJSON = 'https://raw.githubusercontent.com/btouellette/HHHFreshBotRedux/master/docs/daily/' + currentDate.toYYYYMMDD() + '.json';
+        let currentJSON = 'daily/' + currentDate.toYYYYMMDD() + '.json';
         await fetch(currentJSON).then(res => { if(res.ok) { yyyymmdd = currentDate.toYYYYMMDD(); }});
         currentDate = currentDate.addDays(-1);
     }
@@ -138,11 +138,11 @@ let isPopulating = false;
 function populatePage(yyyymmdd, prepend) {
     isPopulating = true;
     $container.append($('<div class="spinner-container"><div class="spinner"><div class="bounce1"></div><div class="bounce2"></div><div class="bounce3"></div></div></div>'));
-    fetch('https://raw.githubusercontent.com/btouellette/HHHFreshBotRedux/master/docs/daily/' + yyyymmdd + '.json').then(res => {
+    fetch('daily/' + yyyymmdd + '.json').then(res => {
         if (res.ok) {
             res.json().then(json => {
                 lastYYYYMMDD = yyyymmdd;
-                
+
                 const dateString = yyyymmdd.fromYYYYMMDDtoDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
                 const $dayContainer = $(`<div class="day-container"><h2 id="${yyyymmdd}">${dateString}</h2></div>`);
                 if (prepend) {
@@ -150,26 +150,26 @@ function populatePage(yyyymmdd, prepend) {
                 } else {
                     $container.append($dayContainer);
                 }
-                
+
                 json.forEach(post => {
                     //TODO: if wrapper fails add reddit embed
                     const wrapStart = `<div class="grid-item" ${getScoreDataAttr(post)}><div class="embedly-card"><div class="embedly-card-hug">`;
                     const wrapEnd = '</div></div></div>';
-                    
+
                     if (post.url.includes('youtube.com') || post.url.includes('youtu.be')) {
-                        
+
                         // YouTube embeds
                         //TODO: if fetch on thumbnail fails don't add to list
                         const ytID = getYoutubeID(post.url);
                         const $newElement = $(wrapStart + `<div class="player youtube-player" data-id="${ytID}"><div data-id="${ytID}"><span>${removeFreshTag(post.title)}</span><img src="https://i.ytimg.com/vi/${ytID}/hqdefault.jpg"><div class="play"></div></div></div>` + wrapEnd);
                         $dayContainer.append($newElement);
                         $newElement.find('.youtube-player > div').on('mousedown', function(e) { replaceYoutubeWithIFrame(e, this, post.url); });
-                        
+
                     } else if (post.url.includes('soundcloud.com')) {
-                        
+
                         const widget_options = '';
                         $.getJSON('https://soundcloud.com/oembed.json?url=' + post.url + widget_options)
-                         .done(function (oembedData) { 
+                         .done(function (oembedData) {
                             if (oembedData.thumbnail_url.includes('placeholder')) {
                                 const soundcloudClientID = 'LvWovRaJZlWCHql0bISuum8Bd2KX79mb';
                                 $.getJSON(`https://api.soundcloud.com/resolve.json?client_id=${soundcloudClientID}&url=${post.url}`)
@@ -195,16 +195,16 @@ function populatePage(yyyymmdd, prepend) {
                                 $newElement.find('.soundcloud-player > div').on('mousedown', function(e) { replaceSoundcloudWithIframe(e, oembedData.html, this, post.url); });
                             }
                          });
-                         
+
                     } else {
-                        
+
                         // Spotify API access to get album artwork requires user authorization
                         // Bandcamp, Datpiff, iTunes no public APIs but could scrape with server side code (if there was any)
-                        
+
                         // Reddit embeds for everything else (these are much more expensive since they typically embed reddit and then a third party site as well)
                         const $newElement = $(`<div class="grid-item" ${getScoreDataAttr(post)}><blockquote class="reddit-card" data-card-created="${Math.floor(Date.now() / 1000)}"><a href="https://www.reddit.com${post.permalink}?ref=share&ref_source=embed"></a></blockquote></div>`);
                         $dayContainer.append($newElement);
-                        
+
                     }
                 });
                 $('.spinner').remove();
@@ -252,7 +252,7 @@ $(window).scroll(function() {
         let yyyymmdd = lastYYYYMMDD.fromYYYYMMDDtoDate().addDays(-1).toYYYYMMDD();
         populatePage(yyyymmdd);
     }
-   
+
    // Set hash based on which header we are below, don't add to history
     var st = window.pageYOffset || document.documentElement.scrollTop;
     var dayTops = $('.day-container > h2').map(function(){ return { top: $(this).offset().top, id: $(this).attr('id') }}).get();
