@@ -464,7 +464,7 @@ const FreshBot = {
 
       // If the message will exceed the max length of a PM split it into separate messages
       if (Template.introWeekly.length + message.length + dayTable.length + Template.footer.length > config.reddit.PM_MAX_LENGTH) {
-        message = messages.length == 0 ? Template.introWeekly : '' + '**Part ' + (messages.length + 1) + '**\n\n' + message + Template.footer;
+        message = (messages.length == 0 ? Template.introWeekly : '') + '**Part ' + (messages.length + 1) + '**\n\n' + message + Template.footer;
         messages.push(message);
         message = dayTable;
       } else {
@@ -483,7 +483,7 @@ const FreshBot = {
 
     const messagesSent = [];
     const subs = await DB.getDailySubscribers();
-    subs.forEach(sub => { messagesSent.push(FreshBot.sendMessagesToSub(sub, subject, message)); });
+    subs.forEach(sub => { messagesSent.push(FreshBot.sendMessagesToSub(sub, subject, messages)); });
 
     return Promise.all(messagesSent);
   },
@@ -537,7 +537,7 @@ const FreshBot = {
     // Submit post with weekly roundup
     const postsSent = [
       reddit.submitSelfpost({
-        subredditName: 'testingground4bots', //'hiphopheads',
+        subredditName: 'hiphopheads',
         title: title,
         text: messages[0],
       })
