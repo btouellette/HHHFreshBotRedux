@@ -586,12 +586,12 @@ const FreshBot = {
     // Check if weekly messages and post needs to be sent
     const sentWeeksDone = [];
 
-    for (let weekStart = await DB.getMinDate(); weekStart.addDays(7).addHours(6) < endDate; weekStart = weekStart.addDays(7)) {
+    for (let weekStart = await DB.getMinDate(); weekStart.addDays(8).addHours(14) < endDate; weekStart = weekStart.addDays(7)) {
       if (!FreshBot.scoresUpdated) {
         await FreshBot.updateScores();
         FreshBot.scoresUpdated = true;
       }
-      // We've loaded 6 hours into a new week, send weekly messages and post
+      // We've loaded 14 hours (14:00 UTC is 7:00 Pacific) into the Monday of a new week, send weekly messages and post
       const weekEnd = weekStart.addDays(7);
       logger.info('Processing week between ' + weekStart + ' and ' + weekEnd);
 
