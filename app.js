@@ -128,7 +128,7 @@ const GitHub = {
 
     logger.info('Pushing posts for ' + dayString + ' to GitHub');
 
-    return GitHub.pushFileToRepo(filepath, contents, message);
+    return GitHub.pushFileToRepo(filepath, contents, message).then(() => GitHub.requestPageBuild());
   },
 
   pushFileToRepo: async function(filepath, contents, message) {
@@ -647,10 +647,7 @@ const FreshBot = {
     await FreshBot.doDailyTasks(endDate);
     await FreshBot.doWeeklyTasks(endDate);
 
-    await Promise.all([
-      DB.close(),
-      GitHub.requestPageBuild(),
-    ]);
+    await DB.close();
 
     process.exit(0);
   },
