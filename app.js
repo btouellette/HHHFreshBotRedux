@@ -425,35 +425,27 @@ const FreshBot = {
     return message;
   },
 
-  formatPostsToTables: async function(posts, availableCharacters) {
+  postToTableRow: function(post) {
+    return '[' + post.title.replace('|', '&#124;') + '](' + post.url + ') | [link](' + post.permalink + ') | +' + post.score + ' | /u/' + post.author + '\n';
+  },
+
+  sendDailyMessages: async function(posts, dayStart) {
+    // Create daily message from posts above threshold and send to all subscribers
+    let messageHeader = Template.introDaily + '**[' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + dayStart.toYYYYMMDD() + ')**\n\n';
     const messages = [];
     let message = Template.tableHeader;
     for (let i = 0, len = posts.length; i < len; i++) {
       const post = posts[i];
-      const newRow = '[' + post.title.replace('|', '&#124;') + '](' + post.url + ') | [link](' + post.permalink + ') | +' + post.score + ' | /u/' + post.author + '\n';
-      if (message.length + newRow.length + 1 > availableCharacters) {
-        messages.push(message + '\n');
+      const newRow = FreshBot.postToTableRow(post);
+      if (config.reddit.PM_MAX_LENGTH > messageHeader.length + message.length + newRow.length + Template.footer.length) {
+        messages.push(messageHeader + message + Template.footer);
+        messageHeader = '**[' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + dayStart.toYYYYMMDD() + ')** (Part ' + (messages.length + 1) + ')\n\n';
         message = Template.tableHeader + newRow;
       } else {
         message += newRow;
       }
     }
-    messages.push(message + '\n');
-    return messages;
-  },
-
-  sendDailyMessages: async function(posts, dayStart) {
-    // Create daily message from posts above threshold and send to all subscribers
-    const messageHeader = Template.introDaily + '**[' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + dayStart.toYYYYMMDD() + ')**';
-    const availableCharacters = config.reddit.PM_MAX_LENGTH - messageHeader.length - Template.footer.length - 12; // 10 is to leave room for " (Part 2)" in header if needed
-    const messages = await FreshBot.formatPostsToTables(posts, availableCharacters);
-    for (let i = 0, len = messages.length; i < len; i++) {
-      if (len > 1) {
-        messages[i] = messageHeader + ' (Part ' + (i + 1) + ')\n\n' + messages[i] + Template.footer;
-      } else {
-        messages[i] = messageHeader + '\n\n' + messages[i] + Template.footer;
-      }
-    }
+    messages.push(messageHeader + message + Template.footer);
 
     const subject = 'The Daily [Fresh]ness - day of ' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 
