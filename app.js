@@ -425,23 +425,46 @@ const FreshBot = {
     return message;
   },
 
+  formatPostsToTables: async function(posts, availableCharacters) {
+    const messages = [];
+    let message = Template.tableHeader;
+    for (let i = 0, len = posts.length; i < len; i++) {
+      const post = posts[i];
+      const newRow = '[' + post.title.replace('|', '&#124;') + '](' + post.url + ') | [link](' + post.permalink + ') | +' + post.score + ' | /u/' + post.author + '\n';
+      if (message.length + newRow.length + 1 > availableCharacters) {
+        messages.push(message + '\n');
+        message = Template.tableHeader + newRow;
+      } else {
+        message += newRow;
+      }
+    }
+    messages.push(message + '\n');
+    return messages;
+  },
+
   sendDailyMessages: async function(posts, dayStart) {
     // Create daily message from posts above threshold and send to all subscribers
-    let message = Template.introDaily;
-    message += '**[' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + dayStart.toYYYYMMDD() + ')**\n\n';
-    message += await FreshBot.formatPostsToTable(posts);
-    message += Template.footer;
+    const messageHeader = Template.introDaily + '**[' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + dayStart.toYYYYMMDD() + ')**';
+    const availableCharacters = config.reddit.PM_MAX_LENGTH - messageHeader.length - Template.footer.length - 12; // 10 is to leave room for " (Part 2)" in header if needed
+    const messages = await FreshBot.formatPostsToTables(posts, availableCharacters);
+    for (let i = 0, len = messages.length; i < len; i++) {
+      if (len > 1) {
+        messages[i] = messageHeader + ' (Part ' + (i + 1) + ')\n\n' + messages[i] + Template.footer;
+      } else {
+        messages[i] = messageHeader + '\n\n' + messages[i] + Template.footer;
+      }
+    }
 
     const subject = 'The Daily [Fresh]ness - day of ' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 
     logger.info('Sending daily message');
 
     logger.debug('Subject: ' + subject);
-    logger.debug('Contents:\n' + message);
+    logger.debug('Contents:\n' + JSON.stringify(messages));
 
     const messagesSent = [];
     const subs = await DB.getDailySubscribers();
-    subs.forEach(sub => { messagesSent.push(FreshBot.sendMessagesToSub(sub, subject, [message])); });
+    subs.forEach(sub => { messagesSent.push(FreshBot.sendMessagesToSub(sub, subject, messages)); });
 
     return Promise.all(messagesSent);
   },
