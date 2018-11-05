@@ -543,6 +543,7 @@ const FreshBot = {
 
     const messages = [];
     let message = '';
+    let messageMaxLength = config.reddit.SELF_POST_MAX_LENGTH;
     for (const day in groupedPosts) {
       const date = new Date(day);
       let dayHeader = '**[' + date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + date.toYYYYMMDD() + ')**\n\n';
@@ -554,21 +555,23 @@ const FreshBot = {
         // If this is the first row for this day we need to add the day and table header to the message with the row
         if (i === 0) {
           const newMessageLength = message.length + dayHeader.length + Template.tableHeader.length + newRow.length + Template.footer.length;
-          if (newMessageLength > messages.length === 0 ? config.reddit.SELF_POST_MAX_LENGTH : config.reddit.COMMENT_MAX_LENGTH) {
+          if (newMessageLength > messageMaxLength) {
             count++;
             messages.push(message + Template.footer);
             dayHeader = '**[' + date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + date.toYYYYMMDD() + ')** (Part ' + count + ')\n\n';
             message = dayHeader + Template.tableHeader + newRow;
+            messageMaxLength = config.reddit.COMMENT_MAX_LENGTH;
           } else {
             message += dayHeader + Template.tableHeader + newRow;
           }
         } else {
           const newMessageLength = message.length + newRow.length + Template.footer.length;
-          if (newMessageLength > messages.length === 0 ? config.reddit.SELF_POST_MAX_LENGTH : config.reddit.COMMENT_MAX_LENGTH) {
+          if (newMessageLength > messageMaxLength) {
             count++;
             messages.push(message + Template.footer);
             dayHeader = '**[' + date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + date.toYYYYMMDD() + ')** (Part ' + count + ')\n\n';
             message = dayHeader + Template.tableHeader + newRow;
+            messageMaxLength = config.reddit.COMMENT_MAX_LENGTH;
           } else {
             message += newRow;
           }
@@ -621,7 +624,7 @@ const FreshBot = {
       const posts = await DB.getPostsForDay(dayStart);
       const postsAboveMinScore = posts.filter(post => post.score >= config.MIN_SCORE);
       if (!config.DEV_ENV) {
-        sentDaysDone.push(GitHub.addPostsToRepo(posts, dayStart));
+        //sentDaysDone.push(GitHub.addPostsToRepo(posts, dayStart));
         sentDaysDone.push(FreshBot.sendDailyMessages(postsAboveMinScore, dayStart));
       }
 
@@ -737,3 +740,6 @@ process.on('uncaughtException', (error) => {
 //==============================================================================
 
 FreshBot.start();
+
+//TODO: remove posts_bk table if new weekly method works
+//TODO: don't mark posts as done if github or daily not sent? add new column or table for github?
