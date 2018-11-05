@@ -437,7 +437,8 @@ const FreshBot = {
     for (let i = 0, len = posts.length; i < len; i++) {
       const post = posts[i];
       const newRow = FreshBot.postToTableRow(post);
-      if (config.reddit.PM_MAX_LENGTH > messageHeader.length + message.length + newRow.length + Template.footer.length) {
+      const newMessageLength = messageHeader.length + message.length + newRow.length + Template.footer.length;
+      if (newMessageLength > config.reddit.PM_MAX_LENGTH) {
         messages.push(messageHeader + message + Template.footer);
         messageHeader = '**[' + dayStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + dayStart.toYYYYMMDD() + ')** (Part ' + (messages.length + 1) + ')\n\n';
         message = Template.tableHeader + newRow;
@@ -474,20 +475,37 @@ const FreshBot = {
     let message = '';
     for (const day in groupedPosts) {
       const date = new Date(day);
-      let dayTable = '**[' + date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + date.toYYYYMMDD() + ')**\n\n';
-      dayTable += await FreshBot.formatPostsToTable(groupedPosts[day]);
-
-      // If the message will exceed the max length of a PM split it into separate messages
-      if (Template.introWeekly.length + message.length + dayTable.length + Template.footer.length > config.reddit.PM_MAX_LENGTH) {
-        message = (messages.length == 0 ? Template.introWeekly : '') + '**Part ' + (messages.length + 1) + '**\n\n' + message + Template.footer;
-        messages.push(message);
-        message = dayTable;
-      } else {
-        message += dayTable;
+      let dayHeader = '**[' + date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + date.toYYYYMMDD() + ')**\n\n';
+      const posts = groupedPosts[day];
+      let count = 1;
+      for (let i = 0, len = posts.length; i < len; i++) {
+        const post = posts[i];
+        const newRow = FreshBot.postToTableRow(post);
+        // If this is the first row for this day we need to add the day and table header to the message with the row
+        if (i === 0) {
+          const newMessageLength = message.length + dayHeader.length + Template.tableHeader.length + newRow.length + Template.footer.length;
+          if (newMessageLength > config.reddit.PM_MAX_LENGTH) {
+            count++;
+            messages.push(message + Template.footer);
+            dayHeader = '**[' + date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + date.toYYYYMMDD() + ')** (Part ' + count + ')\n\n';
+            message = dayHeader + Template.tableHeader + newRow;
+          } else {
+            message += dayHeader + Template.tableHeader + newRow;
+          }
+        } else {
+          const newMessageLength = message.length + newRow.length + Template.footer.length;
+          if (newMessageLength > config.reddit.PM_MAX_LENGTH) {
+            count++;
+            messages.push(message + Template.footer);
+            dayHeader = '**[' + date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) + '](' + config.github.PAGES_LINK + '#' + date.toYYYYMMDD() + ')** (Part ' + count + ')\n\n';
+            message = dayHeader + Template.tableHeader + newRow;
+          } else {
+            message += newRow;
+          }
+        }
       }
     }
-    message = Template.introWeekly + (messages.length == 0 ? '' :  '**Part ' + (messages.length + 1) + '**\n\n') + message + Template.footer;
-    messages.push(message);
+    messages.push(message + Template.footer);
 
     const subject = 'The Weekly [Fresh]ness - week of ' + weekStart.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 
