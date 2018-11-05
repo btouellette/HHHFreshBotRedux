@@ -624,7 +624,7 @@ const FreshBot = {
       const posts = await DB.getPostsForDay(dayStart);
       const postsAboveMinScore = posts.filter(post => post.score >= config.MIN_SCORE);
       if (!config.DEV_ENV) {
-        //sentDaysDone.push(GitHub.addPostsToRepo(posts, dayStart));
+        sentDaysDone.push(GitHub.addPostsToRepo(posts, dayStart));
         sentDaysDone.push(FreshBot.sendDailyMessages(postsAboveMinScore, dayStart));
       }
 
