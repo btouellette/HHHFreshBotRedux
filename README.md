@@ -3,6 +3,7 @@
 This bot compiles [FRESH] posts submitted to /r/hiphopheads. If you want to subscribe, check out these links! - [[Daily](http://www.reddit.com/message/compose/?to=HHHFreshBotRedux&subject=subscribe&message=daily)] [[Weekly](http://www.reddit.com/message/compose/?to=HHHFreshBotRedux&subject=subscribe&message=weekly)]
 
 Posts are also viewable on this repo's GitHub Pages site: https://btouellette.github.io/HHHFreshBotRedux/
+
 Or on the bot's user page on reddit: https://www.reddit.com/user/HHHFreshBotRedux
 
 ### Functionality:
