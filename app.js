@@ -90,7 +90,7 @@ const reddit = new snoowrap({
 });
 reddit.config({
   requestDelay: 0,
-  continueAfterRatelimitError: true,
+  continueAfterRatelimitError: true, //TODO: errors on ratelimit halt application, see if we can sleep Heroku process or queue PMs on error instead
   maxRetryAttempts: 5,
   debug: config.reddit.DEBUG_MODE,
 });
@@ -396,9 +396,12 @@ const FreshBot = {
 
     // Group PMs by user to handle PMs from different users in parallel
     const groupedPMs = newPMs.reduce((r, pm) => {
-      r[pm.author.name] = r[pm.author.name] || [];
-      r[pm.author.name].push(pm);
-      return r;
+      // Only include PM if it has an author (aka not modmail or a site message)
+      if (pm.author.name) {
+        r[pm.author.name] = r[pm.author.name] || [];
+        r[pm.author.name].push(pm);
+        return r;
+      }
     }, Object.create(null));
 
     // For each user process PMs
