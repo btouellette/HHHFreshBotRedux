@@ -397,7 +397,7 @@ const FreshBot = {
     // Group PMs by user to handle PMs from different users in parallel
     const groupedPMs = newPMs.reduce((r, pm) => {
       // Only include PM if it has an author (aka not modmail or a site message)
-      if (pm.author.name) {
+      if (pm.author && pm.author.name) {
         r[pm.author.name] = r[pm.author.name] || [];
         r[pm.author.name].push(pm);
         return r;
