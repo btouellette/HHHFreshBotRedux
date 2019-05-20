@@ -518,7 +518,7 @@ const FreshBot = {
     logger.debug('Contents:\n' + JSON.stringify(messages));
 
     const messagesSent = [];
-    const subs = await DB.getDailySubscribers();
+    const subs = await DB.getWeeklySubscribers();
     subs.forEach(sub => { messagesSent.push(FreshBot.sendMessagesToSub(sub, subject, messages)); });
 
     return Promise.all(messagesSent);
