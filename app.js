@@ -49,6 +49,7 @@ const config = {
     SELF_POST_MAX_LENGTH: process.env.REDDIT_SELF_POST_MAX_LENGTH || 39500,
     COMMENT_MAX_LENGTH:   process.env.REDDIT_COMMENT_MAX_LENGTH || 9500,
     DEBUG_MODE:           process.env.REDDIT_DEBUG_MODE, // true or false/missing
+    SUBREDDIT:            process.env.REDDIT_SUBREDDIT,
   },
   github: {
     PEM:                 process.env.GITHUB_PEM,
@@ -536,7 +537,7 @@ const FreshBot = {
   },
 
   makeWeeklyPost: async function(posts, weekStart) {
-    // Create Reddit post to r/hiphopheads for all posts above threshold
+    // Create Reddit post to configured subreddit for all posts above threshold
     // Group posts by day
     const groupedPosts = posts.reduce((r, post) => {
       r[post.day] = r[post.day] || [];
@@ -593,7 +594,7 @@ const FreshBot = {
     // Submit post with weekly roundup
     const postsSent = [
       reddit.submitSelfpost({
-        subredditName: 'hiphopheads',
+        subredditName: config.reddit.SUBREDDIT,
         title: title,
         text: messages[0],
       })
@@ -638,7 +639,7 @@ const FreshBot = {
   },
 
   doWeeklyTasks: async function(endDate) {
-    // Generate weekly messages to subscribers and post to r/hiphopheads
+    // Generate weekly messages to subscribers and post to configured subreddit
     // Check if weekly messages and post needs to be sent
     const sentWeeksDone = [];
 
@@ -651,7 +652,7 @@ const FreshBot = {
       const weekEnd = weekStart.addDays(7);
       logger.info('Processing week between ' + weekStart + ' and ' + weekEnd);
 
-      // Get weeks posts, send messages, and post to r/hiphopheads
+      // Get weeks posts, send messages, and post to configured subreddit
       const postsAboveMinScore = (await DB.getPostsForWeek(weekStart, weekEnd)).filter(post => post.score >= config.MIN_SCORE);
       if (!config.DEV_ENV) {
         sentWeeksDone.push(FreshBot.sendWeeklyMessages(postsAboveMinScore, weekStart));
