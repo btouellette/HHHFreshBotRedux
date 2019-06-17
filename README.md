@@ -13,7 +13,8 @@ Or on the bot's user page on reddit: https://www.reddit.com/user/HHHFreshBotRedu
 	* If it's a unsubscribe request, it unsubscribes the user from both round ups
 * Send out the daily round up to all subscribed users
 * Send out the weekly round up to all subscribed users
-* Post the weekly round up to /r/hiphopheads
+* ~~Post the weekly round up to /r/hiphopheads~~ (bot banned by mods in favor of a closed source fork of hizinfiz's bot)
+* Post the weekly round up to /r/HHHFreshBotRedux
 * Save the weeks [FRESH] posts to this GitHub repo
 
 Inspired by hizinfiz's [HHHFreshBot](https://github.com/hizinfiz/HHHFreshBot) (in spirit and look if not in code)
