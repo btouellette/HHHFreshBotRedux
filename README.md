@@ -21,7 +21,7 @@ Inspired by hizinfiz's [HHHFreshBot](https://github.com/hizinfiz/HHHFreshBot) (i
 
 ### Setup
 
-* Development environment is running in a [cloud9](c9.io) test environment upgraded to PostgreSQL 10 and Node 10.12.0 (instructions in app.js)
+* Development environment is running in a [cloud9](https://c9.io) test environment upgraded to PostgreSQL 10 and Node 10.12.0 (instructions in app.js)
 * Production environment is running on [Heroku](heroku.com) using [Heroku Scheduler](https://devcenter.heroku.com/articles/scheduler)
 * When starting the bot up for the first time start within 3-4 days of a Sunday as the Reddit search API will only return the most recent ~250 results and if the results don't go back to the previous Sunday the week calculations will use the earliest day returned as the week start
 
