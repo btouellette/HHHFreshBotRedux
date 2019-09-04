@@ -1,11 +1,14 @@
 //TODO: check if media is available and don't add card if not
 //TODO: unload previous days after some number of posts? (windowing)
 //TODO: remember last visit and provide link to that day?
+//TODO: skip loading of JSON for days that are seen if hideSeen option selected
+//TODO: if hideSeen disabled show hidden days (load back in if previous TODO implemented first)
 
 /*global fetch*/
 /*global history*/
 /*global Cookies*/
 /*global $*/
+/*global localStorage*/
 
 Date.prototype.addDays = function (days) {
   const newDate = new Date(this);
@@ -123,8 +126,8 @@ async function findFirstYYYYMMDD() {
 
 let firstYYYYMMDD = null, lastYYYYMMDD = null;
 const $container = $("#embed-container");
-let minScore = parseInt(Cookies.get('minScore'), 10) || 25;
 
+let minScore = parseInt(Cookies.get('minScore'), 10) || 25;
 $("#min-score-input").val(minScore);
 $("#min-score-input").on("keyup keydown change", debounced(1000, function() {
     const newValue = parseInt($("#min-score-input").val(), 10);
@@ -146,6 +149,14 @@ $("#min-score-input").on("keyup keydown change", debounced(1000, function() {
     }
 }));
 
+
+let hideSeen = Cookies.get('hideSeen') === "true" || false;
+$('#hide-seen-checkbox').prop('checked', hideSeen);
+$('#hide-seen-checkbox').change(function() {
+    hideSeen = this.checked;
+    Cookies.set('hideSeen', hideSeen);
+});
+
 let isPopulating = false;
 function populatePage(yyyymmdd, prepend) {
     isPopulating = true;
@@ -162,63 +173,68 @@ function populatePage(yyyymmdd, prepend) {
                 } else {
                     $container.append($dayContainer);
                 }
-
-                json.forEach(post => {
-                    //TODO: if wrapper fails add reddit embed
-                    const wrapStart = `<div class="grid-item" ${getScoreDataAttr(post)}><div class="embedly-card"><div class="embedly-card-hug">`;
-                    const wrapEnd = '</div></div></div>';
-
-                    if (post.url.includes('youtube.com') || post.url.includes('youtu.be')) {
-
-                        // YouTube embeds
-                        //TODO: if fetch on thumbnail fails don't add to list
-                        const ytID = getYoutubeID(post.url);
-                        const $newElement = $(wrapStart + `<div class="player youtube-player" data-id="${ytID}"><div data-id="${ytID}"><span>${removeFreshTag(post.title)}</span><img src="https://i.ytimg.com/vi/${ytID}/hqdefault.jpg"><div class="play"></div></div></div>` + wrapEnd);
-                        $dayContainer.append($newElement);
-                        $newElement.find('.youtube-player > div').on('mousedown', function(e) { replaceYoutubeWithIFrame(e, this, post.url); });
-
-                    } else if (post.url.includes('soundcloud.com')) {
-
-                        const widget_options = '';
-                        $.getJSON('https://soundcloud.com/oembed.json?url=' + post.url + widget_options)
-                         .done(function (oembedData) {
-                            if (oembedData.thumbnail_url.includes('placeholder')) {
-                                const soundcloudClientID = 'LvWovRaJZlWCHql0bISuum8Bd2KX79mb';
-                                $.getJSON(`https://api.soundcloud.com/resolve.json?client_id=${soundcloudClientID}&url=${post.url}`)
-                                 .done(function (resolveData) {
-                                    $.getJSON(`https://api.soundcloud.com/${resolveData.kind}s/${resolveData.id}?client_id=${soundcloudClientID}`)
-                                     .done(function (trackData) {
-                                        let artwork_url = trackData.artwork_url;
-                                        let count = 0;
-                                        while (!artwork_url && trackData.tracks && count < trackData.tracks.length) {
-                                            artwork_url = trackData.tracks[count].artwork_url;
-                                            count++;
-                                        }
-                                        //TODO: see if we can get higher res images here from URL manipulation
-                                        artwork_url = artwork_url || oembedData.thumbnail_url;
-                                        const $newElement = $(wrapStart + `<div class="player soundcloud-player"><div><span>${removeFreshTag(post.title)}</span><img src="${artwork_url}"><div class="play"></div></div></div>` + wrapEnd);
-                                        $dayContainer.append($newElement);
-                                        $newElement.find('.soundcloud-player > div').on('mousedown', function(e) { replaceSoundcloudWithIframe(e, oembedData.html, this, post.url); });
+                
+                // Hide this container if the option is selected and it has already been seen
+                if (hideSeen && localStorage.getItem('#' + yyyymmdd)) {
+                    $dayContainer.hide();
+                } else {
+                    json.forEach(post => {
+                        //TODO: if wrapper fails add reddit embed
+                        const wrapStart = `<div class="grid-item" ${getScoreDataAttr(post)}><div class="embedly-card"><div class="embedly-card-hug">`;
+                        const wrapEnd = '</div></div></div>';
+    
+                        if (post.url.includes('youtube.com') || post.url.includes('youtu.be')) {
+    
+                            // YouTube embeds
+                            //TODO: if fetch on thumbnail fails don't add to list
+                            const ytID = getYoutubeID(post.url);
+                            const $newElement = $(wrapStart + `<div class="player youtube-player" data-id="${ytID}"><div data-id="${ytID}"><span>${removeFreshTag(post.title)}</span><img src="https://i.ytimg.com/vi/${ytID}/hqdefault.jpg"><div class="play"></div></div></div>` + wrapEnd);
+                            $dayContainer.append($newElement);
+                            $newElement.find('.youtube-player > div').on('mousedown', function(e) { replaceYoutubeWithIFrame(e, this, post.url); });
+    
+                        } else if (post.url.includes('soundcloud.com')) {
+    
+                            const widget_options = '';
+                            $.getJSON('https://soundcloud.com/oembed.json?url=' + post.url + widget_options)
+                             .done(function (oembedData) {
+                                if (oembedData.thumbnail_url.includes('placeholder')) {
+                                    const soundcloudClientID = 'LvWovRaJZlWCHql0bISuum8Bd2KX79mb';
+                                    $.getJSON(`https://api.soundcloud.com/resolve.json?client_id=${soundcloudClientID}&url=${post.url}`)
+                                     .done(function (resolveData) {
+                                        $.getJSON(`https://api.soundcloud.com/${resolveData.kind}s/${resolveData.id}?client_id=${soundcloudClientID}`)
+                                         .done(function (trackData) {
+                                            let artwork_url = trackData.artwork_url;
+                                            let count = 0;
+                                            while (!artwork_url && trackData.tracks && count < trackData.tracks.length) {
+                                                artwork_url = trackData.tracks[count].artwork_url;
+                                                count++;
+                                            }
+                                            //TODO: see if we can get higher res images here from URL manipulation
+                                            artwork_url = artwork_url || oembedData.thumbnail_url;
+                                            const $newElement = $(wrapStart + `<div class="player soundcloud-player"><div><span>${removeFreshTag(post.title)}</span><img src="${artwork_url}"><div class="play"></div></div></div>` + wrapEnd);
+                                            $dayContainer.append($newElement);
+                                            $newElement.find('.soundcloud-player > div').on('mousedown', function(e) { replaceSoundcloudWithIframe(e, oembedData.html, this, post.url); });
+                                        });
                                     });
-                                });
-                            } else {
-                                const $newElement = $(wrapStart + `<div class="player soundcloud-player"><div><span>${removeFreshTag(post.title)}</span><img src="${oembedData.thumbnail_url}"><div class="play"></div></div></div>` + wrapEnd);
-                                $dayContainer.append($newElement);
-                                $newElement.find('.soundcloud-player > div').on('mousedown', function(e) { replaceSoundcloudWithIframe(e, oembedData.html, this, post.url); });
-                            }
-                         });
-
-                    } else {
-
-                        // Spotify API access to get album artwork requires user authorization
-                        // Bandcamp, Datpiff, iTunes no public APIs but could scrape with server side code (if there was any)
-
-                        // Reddit embeds for everything else (these are much more expensive since they typically embed reddit and then a third party site as well)
-                        const $newElement = $(`<div class="grid-item" ${getScoreDataAttr(post)}><blockquote class="reddit-card" data-card-created="${Math.floor(Date.now() / 1000)}"><a href="https://www.reddit.com${post.permalink}?ref=share&ref_source=embed"></a></blockquote></div>`);
-                        $dayContainer.append($newElement);
-
-                    }
-                });
+                                } else {
+                                    const $newElement = $(wrapStart + `<div class="player soundcloud-player"><div><span>${removeFreshTag(post.title)}</span><img src="${oembedData.thumbnail_url}"><div class="play"></div></div></div>` + wrapEnd);
+                                    $dayContainer.append($newElement);
+                                    $newElement.find('.soundcloud-player > div').on('mousedown', function(e) { replaceSoundcloudWithIframe(e, oembedData.html, this, post.url); });
+                                }
+                             });
+    
+                        } else {
+    
+                            // Spotify API access to get album artwork requires user authorization
+                            // Bandcamp, Datpiff, iTunes no public APIs but could scrape with server side code (if there was any)
+    
+                            // Reddit embeds for everything else (these are much more expensive since they typically embed reddit and then a third party site as well)
+                            const $newElement = $(`<div class="grid-item" ${getScoreDataAttr(post)}><blockquote class="reddit-card" data-card-created="${Math.floor(Date.now() / 1000)}"><a href="https://www.reddit.com${post.permalink}?ref=share&ref_source=embed"></a></blockquote></div>`);
+                            $dayContainer.append($newElement);
+    
+                        }
+                    });
+                }
                 $('.spinner').remove();
                 isPopulating = false;
                 // If there is no scroll bar go ahead and explicitly trigger a scroll to load the next day
@@ -260,7 +276,7 @@ findFirstYYYYMMDD().then(yyyymmdd => {
 });
 
 $(window).scroll(function() {
-    if(!isPopulating && $(window).scrollTop() + $(window).height() > $(document).height() - 400) {
+    if (!isPopulating && $(window).scrollTop() + $(window).height() > $(document).height() - 400) {
         let yyyymmdd = lastYYYYMMDD.fromYYYYMMDDtoDate().addDays(-1).toYYYYMMDD();
         populatePage(yyyymmdd);
     }
@@ -268,14 +284,18 @@ $(window).scroll(function() {
    // Set hash based on which header we are below, don't add to history
     var st = window.pageYOffset || document.documentElement.scrollTop;
     var dayTops = $('.day-container > h2').map(function(){ return { top: $(this).offset().top, id: $(this).attr('id') }}).get();
-    for(let i = 0, len = dayTops.length; i < len; i++) {
+    for (let i = 0, len = dayTops.length; i < len; i++) {
         if (i == 0 && st < dayTops[0].top) {
             if (window.location.hash !== '') {
+                localStorage.setItem(window.location.hash, true);
                 history.replaceState(null, null, ' ');
             }
             break;
         } else if (i == len - 1 || st > dayTops[i].top && st < dayTops[i + 1].top) {
             if (window.location.hash !== '#' + dayTops[i].id) {
+                if (window.location.hash !== '') {
+                    localStorage.setItem(window.location.hash, true);
+                }
                 history.replaceState(null, null, '#' + dayTops[i].id);
             }
             break;
