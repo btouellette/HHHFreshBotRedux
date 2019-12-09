@@ -61,6 +61,7 @@ const config = {
     REPO_OWNER:          process.env.GITHUB_REPO_OWNER,
     REPO_OWNER_PASSWORD: process.env.GITHUB_REPO_OWNER_PASSWORD,
     PAGES_LINK:          process.env.GITHUB_PAGES_LINK,
+    PAT:                 process.env.GITHUB_PAT,
   },
   DB_URL:    process.env.DATABASE_URL,
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
@@ -161,14 +162,13 @@ const GitHub = {
 
   requestPageBuild: async function() {
     // Pages endpoints not available to GitHub App via installation token
-    // Authenticate with explicit details to primary account to request new build so that new file is available
-    logger.debug('Authenticating to GitHub');
+    // Authenticate with personal access token from primary account to request new build so that new file is available
+    logger.debug('Authenticating to GitHub with PAT');
 
     const octokit = octokitrest();
     octokit.authenticate({
-      type: 'basic',
-      username: config.github.REPO_OWNER,
-      password: config.github.REPO_OWNER_PASSWORD,
+      type: 'token',
+      token: config.github.PAT,
     });
 
     logger.debug('Successfully authenticated to GitHub');
