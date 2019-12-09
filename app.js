@@ -59,7 +59,6 @@ const config = {
     EMAIL:               process.env.GITHUB_EMAIL,
     REPO:                process.env.GITHUB_REPO,
     REPO_OWNER:          process.env.GITHUB_REPO_OWNER,
-    REPO_OWNER_PASSWORD: process.env.GITHUB_REPO_OWNER_PASSWORD,
     PAGES_LINK:          process.env.GITHUB_PAGES_LINK,
     PAT:                 process.env.GITHUB_PAT,
   },
