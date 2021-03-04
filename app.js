@@ -193,7 +193,12 @@ const GitHub = {
 
 // Wrapper for all Postgres DB interaction
 const DB = {
-  client: new pg.Client({ connectionString: config.DB_URL }),
+  client: new pg.Client({ 
+    connectionString: config.DB_URL,
+    ssl: {
+      rejectUnauthorized: false
+    }
+  }),
 
   getMaxTimestamp: async function() {
     // Get the UTC time of the most recent loaded post
