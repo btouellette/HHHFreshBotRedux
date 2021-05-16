@@ -530,13 +530,19 @@ const FreshBot = {
   },
 
   sendMessagesToSub: async function(sub, subject, messages) {
-    // Send messages to a specific subscriber in order
-    for (let i = 0, len = messages.length; i < len; i++) {
-      await reddit.composeMessage({
-        to: sub,
-        subject: subject,
-        text: messages[i],
-      });
+    try {
+      // Send messages to a specific subscriber in order
+      for (let i = 0, len = messages.length; i < len; i++) {
+        await reddit.composeMessage({
+          to: sub,
+          subject: subject,
+          text: messages[i],
+        });
+      }
+    } catch (error) {
+      if (!error.message.startsWith('NOT_WHITELISTED_BY_USER_MESSAGE')) {
+        logger.error(error);
+      }
     }
   },
 
