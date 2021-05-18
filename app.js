@@ -420,7 +420,7 @@ const FreshBot = {
       doneProcessingPMs.push(reddit.markMessagesAsRead(newMessages));
     }
 
-    return Promise.all(doneProcessingPMs);
+    return Promise.allSettled(doneProcessingPMs);
   },
 
   formatPostsToTable: async function(posts) {
@@ -467,7 +467,7 @@ const FreshBot = {
     const subs = await DB.getDailySubscribers();
     subs.forEach(sub => { messagesSent.push(FreshBot.sendMessagesToSub(sub, subject, messages)); });
 
-    return Promise.all(messagesSent);
+    return Promise.allSettled(messagesSent);
   },
 
   sendWeeklyMessages: async function(posts, weekStart) {
@@ -526,7 +526,7 @@ const FreshBot = {
     const subs = await DB.getWeeklySubscribers();
     subs.forEach(sub => { messagesSent.push(FreshBot.sendMessagesToSub(sub, subject, messages)); });
 
-    return Promise.all(messagesSent);
+    return Promise.allSettled(messagesSent);
   },
 
   sendMessagesToSub: async function(sub, subject, messages) {
@@ -645,7 +645,7 @@ const FreshBot = {
       // Update DB to mark this day sent
       sentDaysDone.push(DB.markDaySent(dayStart));
     }
-    return Promise.all(sentDaysDone);
+    return Promise.allSettled(sentDaysDone);
   },
 
   doWeeklyTasks: async function(endDate) {
@@ -672,7 +672,7 @@ const FreshBot = {
       // Purge DB of previous week's data
       sentWeeksDone.push(DB.purgeDays(weekStart, weekEnd));
     }
-    return Promise.all(sentWeeksDone);
+    return Promise.allSettled(sentWeeksDone);
   },
 
   updateScores: async function() {
@@ -691,7 +691,7 @@ const FreshBot = {
       }
     }
 
-    return Promise.all(updateDone);
+    return Promise.allSettled(updateDone);
   },
 
   start: async function() {
@@ -702,7 +702,7 @@ const FreshBot = {
 
     // Process incoming messages and record any new subscriptions/unsubscriptions. Let all users register before moving on to creating posts/messages
     // Populate new posts into database
-    await Promise.all([
+    await Promise.allSettled([
       FreshBot.processPrivateMessages(),
       FreshBot.fetchNewPosts(),
     ]);
