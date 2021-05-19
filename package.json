@@ -7,7 +7,7 @@
   "author": "Brian Ouellette <btouellette@gmail.com>",
   "license": "MIT",
   "engines": {
-    "node": "14.x"
+    "node": "12.x"
   },
   "dependencies": {
     "@octokit/rest": "^15.15.1",
