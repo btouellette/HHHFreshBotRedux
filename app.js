@@ -129,7 +129,7 @@ const GitHub = {
 
     logger.info('Pushing posts for ' + dayString + ' to GitHub');
 
-    return GitHub.pushFileToRepo(filepath, contents, message).then(() => GitHub.requestPageBuild());
+    return GitHub.pushFileToRepo(filepath, contents, message);
   },
 
   pushFileToRepo: async function(filepath, contents, message) {
@@ -160,6 +160,9 @@ const GitHub = {
   },
 
   requestPageBuild: async function() {
+    // This is no longer needed now that GitHub App initiated commits are triggering page builds
+    // Possibly as of this change: https://github.blog/changelog/2021-12-16-github-pages-using-github-actions-for-builds-and-deployments-for-public-repositories/
+
     // Pages endpoints not available to GitHub App via installation token
     // Authenticate with personal access token from primary account to request new build so that new file is available
     logger.debug('Authenticating to GitHub with PAT');
