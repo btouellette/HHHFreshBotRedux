@@ -45,7 +45,7 @@ services:
   pgadmin-compose:
     image: dpage/pgadmin4
     env_file:
-      - .env
+      - .env-pgadmin
     ports:
       - "16543:80"
     depends_on:

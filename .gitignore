@@ -1,3 +1,4 @@
 .env
+.env-pgadmin
 node_modules/
 dump.sql
