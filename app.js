@@ -18,7 +18,8 @@ const config = {
     PM_MAX_LENGTH:        process.env.REDDIT_PM_MAX_LENGTH || 9500, // Current reddit limits are 10k char for PM and comment and 40k char for self post but defaults will undershoot those slightly
     SELF_POST_MAX_LENGTH: process.env.REDDIT_SELF_POST_MAX_LENGTH || 39500,
     COMMENT_MAX_LENGTH:   process.env.REDDIT_COMMENT_MAX_LENGTH || 9500,
-    DEBUG_MODE:           process.env.REDDIT_DEBUG_MODE, // true or false/missing
+    DEBUG_MODE:           process.env.REDDIT_DEBUG_MODE === 'true', // true or false/missing
+    DEBUG_MODE:           process.env.REDDIT_WARNINGS === 'true', // true or false/missing
     SUBREDDIT:            process.env.REDDIT_SUBREDDIT,
   },
   github: {
@@ -52,7 +53,6 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
-
 // Configure snoowrap with Reddit app details
 const reddit = new snoowrap({
   userAgent:    config.reddit.USER_AGENT,
@@ -66,6 +66,7 @@ reddit.config({
   continueAfterRatelimitError: true, //TODO: errors on ratelimit halt application, see if we can sleep Heroku process or queue PMs on error instead
   maxRetryAttempts: 5,
   debug: config.reddit.DEBUG_MODE,
+  warnings: config.reddit.WARNINGS,
 });
 
 // Template of messages in use for reddit PMs and posts
