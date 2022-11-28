@@ -6,36 +6,6 @@ const winston      = require('winston');
 const octokitrest  = require('@octokit/rest');
 const jsonwebtoken = require('jsonwebtoken');
 
-// Built for PostgreSQL 10 and Node 10.12.0
-// Running on Heroku (https://devcenter.heroku.com/articles/scheduler)
-
-// To upgrade c9.io to PostgreSQL 10:
-//    sudo apt-get install -y dpkg
-//    sudo service postgresql stop
-//    sudo apt-get --purge remove postgresql\*
-//    sudo echo "deb http://apt.postgresql.org/pub/repos/apt/ trusty-pgdg main" >> /etc/apt/sources.list.d/pgdg.list
-//    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc > pgkey
-//    sudo apt-key add pgkey
-//    rm pgkey
-//    sudo apt-get update
-//    sudo apt-get install postgresql-10
-//    sudo su - postgres
-//    psql
-//    CREATE ROLE ubuntu SUPERUSER LOGIN REPLICATION CREATEDB CREATEROLE;
-//    CREATE DATABASE ubuntu OWNER ubuntu;
-//    CREATE DATABASE freshbot OWNER ubuntu; (optional)
-//    \password ubuntu
-//    \q
-//    exit
-//
-// SELECT VERSION();
-//
-// To upgrade c9.io to Node 10.12.0:
-//    nvm install 10
-//    nvm alias default 10
-//
-// console.log('Node version is: ' + process.version);
-
 // Read all configuration from environment variables into single object
 const config = {
   reddit: {
@@ -62,10 +32,12 @@ const config = {
     PAGES_LINK:          process.env.GITHUB_PAGES_LINK,
     PAT:                 process.env.GITHUB_PAT,
   },
-  DB_URL:    process.env.DATABASE_URL,
-  LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
-  MIN_SCORE: process.env.MIN_SCORE || 25,
-  DEV_ENV:   process.env.DEV_ENV,
+  POSTGRES_USER:     process.env.POSTGRES_USER,
+  POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
+  POSTGRES_DB:       process.env.POSTGRES_DB,
+  LOG_LEVEL:         process.env.LOG_LEVEL || 'debug',
+  MIN_SCORE:         process.env.MIN_SCORE || 25,
+  DEV_ENV:           process.env.DEV_ENV,
 };
 
 // Set up winston logging
@@ -196,11 +168,12 @@ const GitHub = {
 
 // Wrapper for all Postgres DB interaction
 const DB = {
-  client: new pg.Client({ 
-    connectionString: config.DB_URL,
-    ssl: {
-      rejectUnauthorized: false
-    }
+  client: new pg.Client({
+    user: config.POSTGRES_USER,
+    password: config.POSTGRES_PASSWORD,
+    database: config.POSTGRES_DB,
+    host: 'postgres',
+    ssl: false,
   }),
 
   getMaxTimestamp: async function() {
@@ -302,6 +275,9 @@ const DB = {
 
   init: async function() {
     logger.info('Initializing DB');
+    DB.client.on('error', (err) => {
+      console.error('PG DB error: ', err.stack)
+    });
     // Connect and create tables and indexes
     await DB.client.connect();
     return Promise.all([
