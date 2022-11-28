@@ -400,7 +400,7 @@ const FreshBot = {
       doneProcessingPMs.push(reddit.markMessagesAsRead(newMessages));
     }
 
-    return Promise.allSettled(doneProcessingPMs);
+    return Promise.allSettled(doneProcessingPMs).then(logFailedPromises);
   },
 
   formatPostsToTable: async function(posts) {
@@ -447,7 +447,7 @@ const FreshBot = {
     const subs = await DB.getDailySubscribers();
     subs.forEach(sub => { messagesSent.push(FreshBot.sendMessagesToSub(sub, subject, messages)); });
 
-    return Promise.allSettled(messagesSent);
+    return Promise.allSettled(messagesSent).then(logFailedPromises);
   },
 
   sendWeeklyMessages: async function(posts, weekStart) {
@@ -506,7 +506,7 @@ const FreshBot = {
     const subs = await DB.getWeeklySubscribers();
     subs.forEach(sub => { messagesSent.push(FreshBot.sendMessagesToSub(sub, subject, messages)); });
 
-    return Promise.allSettled(messagesSent);
+    return Promise.allSettled(messagesSent).then(logFailedPromises);
   },
 
   sendMessagesToSub: async function(sub, subject, messages) {
@@ -625,7 +625,7 @@ const FreshBot = {
       // Update DB to mark this day sent
       sentDaysDone.push(DB.markDaySent(dayStart));
     }
-    return Promise.allSettled(sentDaysDone);
+    return Promise.allSettled(sentDaysDone).then(logFailedPromises);
   },
 
   doWeeklyTasks: async function(endDate) {
@@ -652,7 +652,7 @@ const FreshBot = {
       // Purge DB of previous week's data
       sentWeeksDone.push(DB.purgeDays(weekStart, weekEnd));
     }
-    return Promise.allSettled(sentWeeksDone);
+    return Promise.allSettled(sentWeeksDone).then(logFailedPromises);
   },
 
   updateScores: async function() {
@@ -671,7 +671,7 @@ const FreshBot = {
       }
     }
 
-    return Promise.allSettled(updateDone);
+    return Promise.allSettled(updateDone).then(logFailedPromises);
   },
 
   start: async function() {
@@ -730,6 +730,13 @@ process.on('uncaughtException', (error) => {
   logger.error(error);
   process.exit(1);
 });
+
+// Intended to be chained off the results of a Promise.allSettled call
+function logFailedPromises(results) {
+  results.filter((r) => r.status === "rejected").forEach((error) => {
+    logger.error('Failed promise detected, error: ', JSON.stringify(error));
+  });
+}
 
 //==============================================================================
 
