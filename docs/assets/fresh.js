@@ -73,10 +73,6 @@ function getYoutubePlaylist(url) {
     return match[1];
 }
 
-function getScoreDataAttr(post) {
-    return `data-score="${post.score}"${post.score < minScore ? ' style="display: none;"' : ''}`;
-}
-
 function replaceYoutubeWithIFrame(e, wrapper, url) {
     if (e.which == 2) {
         window.open(url);
@@ -149,13 +145,36 @@ $("#min-score-input").on("keyup keydown change", debounced(1000, function() {
     }
 }));
 
-
 let hideSeen = Cookies.get('hideSeen') === "true" || false;
 $('#hide-seen-checkbox').prop('checked', hideSeen);
 $('#hide-seen-checkbox').change(function() {
     hideSeen = this.checked;
     Cookies.set('hideSeen', hideSeen);
 });
+
+let albumsOnly = Cookies.get('albumsOnly') === "true" || false;
+$('#albums-only-checkbox').prop('checked', albumsOnly);
+$('#albums-only-checkbox').change(function() {
+    albumsOnly = this.checked;
+    if (albumsOnly) {
+        $(".grid-item").filter(function() {
+            return !$(this).data("album");
+        }).hide();
+    } else {
+        $(".grid-item").filter(function() {
+            return !$(this).data("album");
+        }).show();
+    }
+    // Trigger loading the next day if necessary
+    $(window).scroll();
+    Cookies.set('albumsOnly', albumsOnly);
+});
+
+function getScoreAndAlbumDataAttrs(post) {
+    const isAlbum = post.title.toUpperCase().includes('FRESH ALBUM');
+    const belowMinScore = post.score < minScore;
+    return `data-album="${isAlbum}" data-score="${post.score}"${belowMinScore || albumsOnly && !isAlbum? ' style="display: none;"' : ''}`;
+}
 
 let isPopulating = false;
 function populatePage(yyyymmdd, prepend) {
@@ -180,9 +199,9 @@ function populatePage(yyyymmdd, prepend) {
                 } else {
                     json.forEach(post => {
                         //TODO: if wrapper fails add reddit embed
-                        const wrapStart = `<div class="grid-item" ${getScoreDataAttr(post)}><div class="embedly-card"><div class="embedly-card-hug">`;
+                        const wrapStart = `<div class="grid-item" ${getScoreAndAlbumDataAttrs(post)}><div class="embedly-card"><div class="embedly-card-hug">`;
                         const wrapEnd = '</div></div></div>';
-    
+
                         if (post.url.includes('youtube.com') || post.url.includes('youtu.be')) {
     
                             // YouTube embeds
@@ -229,7 +248,7 @@ function populatePage(yyyymmdd, prepend) {
                             // Bandcamp, Datpiff, iTunes no public APIs but could scrape with server side code (if there was any)
     
                             // Reddit embeds for everything else (these are much more expensive since they typically embed reddit and then a third party site as well)
-                            const $newElement = $(`<div class="grid-item" ${getScoreDataAttr(post)}><blockquote class="reddit-card" data-card-created="${Math.floor(Date.now() / 1000)}"><a href="https://www.reddit.com${post.permalink}?ref=share&ref_source=embed"></a></blockquote></div>`);
+                            const $newElement = $(`<div class="grid-item" ${getScoreAndAlbumDataAttrs(post)}><blockquote class="reddit-card" data-card-created="${Math.floor(Date.now() / 1000)}"><a href="https://www.reddit.com${post.permalink}?ref=share&ref_source=embed"></a></blockquote></div>`);
                             $dayContainer.append($newElement);
     
                         }
