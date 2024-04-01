@@ -248,9 +248,16 @@ function populatePage(yyyymmdd, prepend) {
                             // Bandcamp, Datpiff, iTunes no public APIs but could scrape with server side code (if there was any)
     
                             // Reddit embeds for everything else (these are much more expensive since they typically embed reddit and then a third party site as well)
-                            const $newElement = $(`<div class="grid-item" ${getScoreAndAlbumDataAttrs(post)}><blockquote class="reddit-card" data-card-created="${Math.floor(Date.now() / 1000)}"><a href="https://www.reddit.com${post.permalink}?ref=share&ref_source=embed"></a></blockquote></div>`);
+                            const $newElement = $(`<div class="grid-item" ${getScoreAndAlbumDataAttrs(post)}></div>`);
+                            const iframe = document.createElement("iframe");
+                            iframe.onload = function() {
+                                let doc = iframe.contentWindow || iframe.contentDocument && iframe.contentDocument.document || iframe.contentDocument;
+                                doc.document.open();
+                                doc.document.write(`<html><body style="margin: 0;"><blockquote class="reddit-embed-bq" data-embed-height="300"><a href="https://www.reddit.com${post.permalink}">${post.title}</a><br> by<a href="https://www.reddit.com/user/${post.author}/">u/${post.author}</a> in<a href="https://www.reddit.com/r/hiphopheads/">hiphopheads</a></blockquote><script async="" src="https://embed.reddit.com/widgets.js" charset="UTF-8"></script></body></html>`);
+                                doc.document.close();
+                            }
+                            $newElement.append(iframe);
                             $dayContainer.append($newElement);
-    
                         }
                     });
                 }

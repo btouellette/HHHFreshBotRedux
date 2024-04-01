@@ -216,6 +216,14 @@ button {
     margin-bottom: 10px;
 }
 
+.grid-item > iframe {
+    display: block;
+    margin: 0 auto 20px auto;
+    min-height: 260px;
+    width: 600px;
+    border: 0;
+}
+
 /*.spinner {*/
 /*  margin: 10px auto 0;*/
 /*  width: 70px;*/
