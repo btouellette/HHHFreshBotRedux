@@ -123,28 +123,6 @@ async function findFirstYYYYMMDD() {
 let firstYYYYMMDD = null, lastYYYYMMDD = null;
 const $container = $("#embed-container");
 
-let minScore = parseInt(Cookies.get('minScore'), 10) || 25;
-$("#min-score-input").val(minScore);
-$("#min-score-input").on("keyup keydown change", debounced(1000, function() {
-    const newValue = parseInt($("#min-score-input").val(), 10);
-    const oldValue = minScore;
-    if (oldValue != newValue) {
-        if (newValue < oldValue) {
-            $(".grid-item").filter(function() {
-                const score = parseInt($(this).data("score"), 10);
-                return score >= newValue && score < oldValue;
-            }).show();
-        } else {
-            $(".grid-item").filter(function() {
-                const score = parseInt($(this).data("score"), 10);
-                return score > oldValue && score <= newValue;
-            }).hide();
-        }
-        minScore = newValue;
-        Cookies.set('minScore', newValue);
-    }
-}));
-
 let hideSeen = Cookies.get('hideSeen') === "true" || false;
 $('#hide-seen-checkbox').prop('checked', hideSeen);
 $('#hide-seen-checkbox').change(function() {
@@ -152,23 +130,33 @@ $('#hide-seen-checkbox').change(function() {
     Cookies.set('hideSeen', hideSeen);
 });
 
+let minScore = parseInt(Cookies.get('minScore'), 10) || 25;
+$("#min-score-input").val(minScore);
+$("#min-score-input").on("keyup keydown change", debounced(1000, function() {
+    const newValue = parseInt($("#min-score-input").val(), 10);
+    const oldValue = minScore;
+    if (oldValue != newValue) {
+        minScore = newValue;
+        Cookies.set('minScore', newValue);
+        applyAllFiltering();
+    }
+}));
+
 let albumsOnly = Cookies.get('albumsOnly') === "true" || false;
 $('#albums-only-checkbox').prop('checked', albumsOnly);
 $('#albums-only-checkbox').change(function() {
     albumsOnly = this.checked;
-    if (albumsOnly) {
-        $(".grid-item").filter(function() {
-            return !$(this).data("album");
-        }).hide();
-    } else {
-        $(".grid-item").filter(function() {
-            return !$(this).data("album");
-        }).show();
-    }
+    Cookies.set('albumsOnly', albumsOnly);
+    applyAllFiltering();
+});
+
+function applyAllFiltering() {
+    $(".grid-item").each(function () {
+        $(this).toggle((!albumsOnly || $(this).data("album")) && parseInt($(this).data("score"), 10) >= minScore);
+    });
     // Trigger loading the next day if necessary
     $(window).scroll();
-    Cookies.set('albumsOnly', albumsOnly);
-});
+}
 
 function getScoreAndAlbumDataAttrs(post) {
     const isAlbum = post.title.toUpperCase().includes('FRESH ALBUM');
