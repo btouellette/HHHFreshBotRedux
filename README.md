@@ -13,7 +13,6 @@ Or on the bot's user page on reddit: https://www.reddit.com/user/HHHFreshBotRedu
 	* If it's a unsubscribe request, it unsubscribes the user from both round ups
 * Send out the daily round up to all subscribed users
 * Send out the weekly round up to all subscribed users
-* ~~Post the weekly round up to /r/hiphopheads~~ (bot banned by mods in favor of a closed source fork of hizinfiz's bot)
 * Post the weekly round up to /r/HHHFreshBotRedux
 * Save the weeks [FRESH] posts to this GitHub repo
 
@@ -21,8 +20,7 @@ Inspired by hizinfiz's [HHHFreshBot](https://github.com/hizinfiz/HHHFreshBot) (i
 
 ### Setup
 
-* Development environment is running in a [cloud9](https://c9.io) test environment upgraded to PostgreSQL 10 and Node 10.12.0 (instructions in app.js)
-* Production environment is running on [Heroku](heroku.com) using [Heroku Scheduler](https://devcenter.heroku.com/articles/scheduler)
+* Environment is using Docker Compose so startup should be as simple as `docker compose up` which will start it running checking once an hour for new posts. To run it on demand once use `command: "node /usr/src/app/app.js"` in [docker-compose.yml](docker-compose.yml)
 * When starting the bot up for the first time start within 3-4 days of a Sunday as the Reddit search API will only return the most recent ~250 results and if the results don't go back to the previous Sunday the week calculations will use the earliest day returned as the week start
 
 ### License

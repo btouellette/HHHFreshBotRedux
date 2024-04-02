@@ -63,7 +63,7 @@ const reddit = new snoowrap({
 });
 reddit.config({
   requestDelay: 0,
-  continueAfterRatelimitError: true, //TODO: errors on ratelimit halt application, see if we can sleep Heroku process or queue PMs on error instead
+  continueAfterRatelimitError: true,
   maxRetryAttempts: 5,
   debug: config.reddit.DEBUG_MODE,
   warnings: config.reddit.WARNINGS,
