@@ -3,6 +3,8 @@ services:
   # this directory. A cron job inside the container runs `node app.js` hourly
   # (see crontab/root).
   app:
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
     build: .
     env_file:
       - .env
